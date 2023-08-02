@@ -7,7 +7,7 @@
 //#include <Arrays/ArrayDouble.mqh>
 #include <Generic/HashMap.mqh>
 #include <Arrays/ArrayDouble.mqh>
-
+#include <Math/Stat/Math.mqh>
 
 static input long    InpMagicnumber = 234234;   // magic number (Integer+)
 
@@ -79,10 +79,11 @@ bool sellSignal;
 bool sellStatus;
 
 int handleSto;
-double stoBuffer[];
+double stoMainBuffer[];
 bool stoBuySignal;
 bool stoSellSignal;
 double stoTempBuffer[];
+double stoSignalBuffer[];
 
 int handleRSI;
 double rsiBuffer[];
@@ -101,7 +102,7 @@ bool macdBuySignal;
 bool macdSellSignal;
 
 int handleHardSto;
-double hardStoBuffer[];
+double hardstoMainBuffer[];
 bool hardStoSellSignal;
 bool hardStoBuySignal;
 
@@ -123,8 +124,9 @@ int OnInit(){
    sellSignal = false;
 
    handleSto = iStochastic( NULL,PERIOD_H1,InpStoKPeriod,InpStoDPeriod,InpStoSlowing,InpStoMAMethod,InpStoPrice ); 
-   ArrayResize(stoBuffer,2);
-   ArrayResize(stoTempBuffer,2);
+   ArrayResize(stoMainBuffer,1);
+   ArrayResize(stoTempBuffer,1);
+   ArrayResize(stoSignalBuffer,1);
    
    handleRSI = iRSI(NULL,PERIOD_H1,InpRSIMAPeriod,InpRSIAppPrice);
    ArrayResize(rsiBuffer,1);
@@ -133,11 +135,11 @@ int OnInit(){
    ArrayResize(cciBuffer,1);
    
    handleMACD = iMACD(NULL,PERIOD_H1,InpMACDFastPeriod,InpMACDSlowPeriod,InpMACDSignalPeriod,InpMACDAppPrice);
-   //ArrayResize(macdBuffer,)
-   
+   ArrayResize(macdBuffer,10);
+   ArrayResize(macdTempBuffer,10);
    
    handleHardSto = iStochastic(NULL,PERIOD_D1,InpHardStoKPeriod,InpHardStoDPeriod,InpHardStoSlowing,InpHardStoMAMethod,InpHardStoPrice);
-   ArrayResize(hardStoBuffer,2);
+   ArrayResize(hardstoMainBuffer,5);
 
    return(INIT_SUCCEEDED);
 }
@@ -181,12 +183,17 @@ void OnTick(){
 
    Comment("Ask: ",currentTick.ask," NextBuyPrice: ",NextBuyPrice," DynamicBuyPrice: ",dynamicBuyPrice," accBuyLot: ",accBuyLot,
          "\nBid: ",currentTick.bid," NextSellPrice: ",NextSellPrice," DynamicSellPrice: ",dynamicSellPrice," accSellLot: ",accSellLot,
-         "\nhardStoBuySignal: ",hardStoBuySignal," hardStoSellSignal: ",hardStoSellSignal,
-         "\nstoBuySignal: ",stoBuySignal," stoSellSignal: ",stoSellSignal,
-         "\nrsiBuySignal: ",rsiBuySignal," rsiSellSignal: ",rsiSellSignal,
-         "\ncciBuySignal: ",cciBuySignal," cciSellSignal: ",cciSellSignal,
-         "\n",stoTempBuffer[0]," ",stoTempBuffer[1]
+         "\n",stoTempBuffer[0]," ",//stoTempBuffer[1]," ",stoTempBuffer[2]," ",stoTempBuffer[3],
+         "\n",MathRound(macdTempBuffer[0],6)," ",MathRound(macdTempBuffer[1],6)," ",MathRound(macdTempBuffer[2],6)," ",MathRound(macdTempBuffer[3],6)," ",MathRound(macdTempBuffer[4],6)," ",MathRound(macdTempBuffer[5],6),
+         "\n",rsiBuffer[0],
+         "\n",cciBuffer[0],
+         "\n",stoMainBuffer[0],//,stoMainBuffer[1]," ",stoMainBuffer[2]," ",stoMainBuffer[3]," ",stoMainBuffer[4]," ",stoMainBuffer[5]," ",stoMainBuffer[6]
+         "\n",stoSignalBuffer[0]
          );
+         //"\nhardStoBuySignal: ",hardStoBuySignal," hardStoSellSignal: ",hardStoSellSignal,
+         //"\nstoBuySignal: ",stoBuySignal," stoSellSignal: ",stoSellSignal,
+         //"\nrsiBuySignal: ",rsiBuySignal," rsiSellSignal: ",rsiSellSignal,
+         //"\ncciBuySignal: ",cciBuySignal," cciSellSignal: ",cciSellSignal,
 }
 
 void LotSizeUpdate(string cmd){
@@ -355,13 +362,17 @@ bool GetAllTicket(ulong& ticketBuyArr[],ulong& ticketSellArr[]){
 }
 
 void UpdateIndicatorBuffer(){
-   ArrayCopy( stoTempBuffer,stoBuffer );
-   CopyBuffer( handleSto,0,0,2,stoBuffer );
+   //ArrayCopy( stoTempBuffer,stoMainBuffer );
+   CopyBuffer( handleSto,MAIN_LINE,0,1,stoMainBuffer );
+   CopyBuffer( handleSto,SIGNAL_LINE,0,1,stoSignalBuffer );
+
    
-   CopyBuffer( handleRSI,0,0,1,rsiBuffer );
-   CopyBuffer( handleCCI,0,0,1,cciBuffer );
+   CopyBuffer( handleRSI,MAIN_LINE,0,1,rsiBuffer );
+   CopyBuffer( handleCCI,MAIN_LINE,0,1,cciBuffer );
+   ArrayCopy( macdTempBuffer,macdBuffer );
+   CopyBuffer( handleMACD,MAIN_LINE,0,1,macdBuffer );
    
-   CopyBuffer( handleHardSto,0,0,2,hardStoBuffer );
+   CopyBuffer( handleHardSto,MAIN_LINE,0,5,hardstoMainBuffer );
 }
 
 void SignalByIndicator(){
@@ -376,9 +387,9 @@ void SignalByIndicator(){
 void HardStoSignal(){
    hardStoBuySignal = true;
    hardStoSellSignal = true;
-   if( hardStoBuffer[0] >= InpHardStoUpper || hardStoBuffer[1] >= InpHardStoUpper ){
+   if( hardstoMainBuffer[0] >= InpHardStoUpper || hardstoMainBuffer[1] >= InpHardStoUpper ){
       hardStoBuySignal = false;
-   }else if( hardStoBuffer[0] <= InpHardStoLower || hardStoBuffer[1] <= InpHardStoLower ){
+   }else if( hardstoMainBuffer[0] <= InpHardStoLower || hardstoMainBuffer[1] <= InpHardStoLower ){
       hardStoSellSignal = false;
    }
 }
@@ -387,12 +398,12 @@ void StoSignal(){
    stoBuySignal = false;
    stoSellSignal = false;
 
-   if(stoTempBuffer[1] <= stoTempBuffer[0] && stoBuffer[1] > stoBuffer[0] && stoBuffer[0] < InpStoUpper && stoBuffer[1] < InpStoUpper){
-      stoBuySignal = true;
-   }
-   if( stoTempBuffer[1] >= stoTempBuffer[0] && stoBuffer[1] < stoBuffer[0] && stoBuffer[0] > InpStoLower && stoBuffer[1] > InpStoLower ){
-      stoSellSignal = true;
-   }
+   //if(stoTempBuffer[1] <= stoTempBuffer[0] && stoMainBuffer[1] > stoMainBuffer[0] && stoMainBuffer[0] < InpStoUpper && stoMainBuffer[1] < InpStoUpper){
+   //   stoBuySignal = true;
+   //}
+   //if( stoTempBuffer[1] >= stoTempBuffer[0] && stoMainBuffer[1] < stoMainBuffer[0] && stoMainBuffer[0] > InpStoLower && stoMainBuffer[1] > InpStoLower ){
+   //   stoSellSignal = true;
+   //}
    
 }
 
