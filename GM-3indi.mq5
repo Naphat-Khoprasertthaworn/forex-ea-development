@@ -96,8 +96,8 @@ bool cciBuySignal;
 bool cciSellSignal;
 
 int handleMACD;
-double macdBuffer[];
-double macdTempBuffer[];
+double macdMainBuffer[];
+double macdMainTempBuffer[];
 bool macdBuySignal;
 bool macdSellSignal;
 
@@ -135,8 +135,8 @@ int OnInit(){
    ArrayResize(cciBuffer,1);
    
    handleMACD = iMACD(NULL,PERIOD_H1,InpMACDFastPeriod,InpMACDSlowPeriod,InpMACDSignalPeriod,InpMACDAppPrice);
-   ArrayResize(macdBuffer,10);
-   ArrayResize(macdTempBuffer,10);
+   ArrayResize(macdMainBuffer,1);
+   ArrayResize(macdMainTempBuffer,1);
    
    handleHardSto = iStochastic(NULL,PERIOD_D1,InpHardStoKPeriod,InpHardStoDPeriod,InpHardStoSlowing,InpHardStoMAMethod,InpHardStoPrice);
    ArrayResize(hardstoMainBuffer,5);
@@ -184,7 +184,7 @@ void OnTick(){
    Comment("Ask: ",currentTick.ask," NextBuyPrice: ",NextBuyPrice," DynamicBuyPrice: ",dynamicBuyPrice," accBuyLot: ",accBuyLot,
          "\nBid: ",currentTick.bid," NextSellPrice: ",NextSellPrice," DynamicSellPrice: ",dynamicSellPrice," accSellLot: ",accSellLot,
          "\n",stoTempBuffer[0]," ",//stoTempBuffer[1]," ",stoTempBuffer[2]," ",stoTempBuffer[3],
-         "\n",MathRound(macdTempBuffer[0],6)," ",MathRound(macdTempBuffer[1],6)," ",MathRound(macdTempBuffer[2],6)," ",MathRound(macdTempBuffer[3],6)," ",MathRound(macdTempBuffer[4],6)," ",MathRound(macdTempBuffer[5],6),
+         "\n",MathRound(macdMainTempBuffer[0],6)," ",MathRound(macdMainTempBuffer[1],6)," ",MathRound(macdMainTempBuffer[2],6)," ",MathRound(macdMainTempBuffer[3],6)," ",MathRound(macdMainTempBuffer[4],6)," ",MathRound(macdMainTempBuffer[5],6),
          "\n",rsiBuffer[0],
          "\n",cciBuffer[0],
          "\n",stoMainBuffer[0],//,stoMainBuffer[1]," ",stoMainBuffer[2]," ",stoMainBuffer[3]," ",stoMainBuffer[4]," ",stoMainBuffer[5]," ",stoMainBuffer[6]
@@ -362,15 +362,17 @@ bool GetAllTicket(ulong& ticketBuyArr[],ulong& ticketSellArr[]){
 }
 
 void UpdateIndicatorBuffer(){
-   //ArrayCopy( stoTempBuffer,stoMainBuffer );
    CopyBuffer( handleSto,MAIN_LINE,0,1,stoMainBuffer );
    CopyBuffer( handleSto,SIGNAL_LINE,0,1,stoSignalBuffer );
 
-   
    CopyBuffer( handleRSI,MAIN_LINE,0,1,rsiBuffer );
    CopyBuffer( handleCCI,MAIN_LINE,0,1,cciBuffer );
-   ArrayCopy( macdTempBuffer,macdBuffer );
-   CopyBuffer( handleMACD,MAIN_LINE,0,1,macdBuffer );
+   
+   
+   ArrayCopy( macdMainTempBuffer,macdMainBuffer );
+   ArrayCopy( macdSignalTempBuffer,macdSignalBuffer );
+   CopyBuffer( handleMACD,MAIN_LINE,0,1,macdMainBuffer );
+   CopyBuffer( handleMACD,SIGNAL_LINE,0,1,macdSignalBuffer );
    
    CopyBuffer( handleHardSto,MAIN_LINE,0,5,hardstoMainBuffer );
 }
