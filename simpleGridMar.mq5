@@ -10,14 +10,13 @@ static input double  InpLotSize     = 0.01;     // lot size
 input int            InpPeriod      = 3600;       // period (sec)
 //input double         InpDeviation   = 2.0;      // deviation
 input int            InpStopLoss    = 0;        // stop loss in points (point) (0=off)
-input int            InpTakeProfit  = 200;      // take profit in points (point) (0=off)
-input int            InpGridStep    = 200;      // step in grid system (point)
+input int            InpTakeProfit  = 150;      // take profit in points (point) (0=off)
+input int            InpGridStep    = 150;      // step in grid system (point)
 
-input double         InpMaxLotSize  = 0.1;      // max lot size
-input double         InpLotMultiply = 2;        // multiply lot size
+input double         InpMaxLotSize  = 0.15;      // max lot size
+input double         InpLotMultiply = 1.5;        // multiply lot size
 
 CTrade trade;
-//MqlRates PriceInfo[];
 MqlTick currentTick;
 long levarage;
 string signal = "";
@@ -36,9 +35,8 @@ int OnInit()
    accLot = 0;
    dynamicOpenPrice = 0;
    lastestLotSize = 0;
-   lastestOpenTime = TimeCurrent()-3600;
+   lastestOpenTime = TimeCurrent()-InpPeriod;
    return(INIT_SUCCEEDED);
-   
 }
 
 void OnDeinit(const int reason)
@@ -57,9 +55,6 @@ void OnTick()
 
    static double NextBuyPrice,NextSellPrice;
    
-   //ArraySetAsSeries(PriceInfo,true);
-   
-   //int PriceData = CopyRates(_Symbol,_Period,0,3,PriceInfo);
    long type=NULL;
    if(CloseOrder(type)){
       NextBuyPrice=currentTick.ask;
@@ -68,7 +63,7 @@ void OnTick()
    }else{
       signal = (type==POSITION_TYPE_BUY) ? "buy" : "sell";
    }
-   if(signal=="sell" && currentTick.bid>=NextSellPrice && lastestOpenTime + 3600 <= currentTick.time){
+   if(signal=="sell" && currentTick.bid>=NextSellPrice && lastestOpenTime + InpPeriod <= currentTick.time){
       
       LotSizeUpdate();
       
@@ -81,7 +76,7 @@ void OnTick()
       lastestOpenTime = currentTick.time;
       Comment("Bid: ",currentTick.bid,"\nNextSellPrice: ",NextSellPrice,"\nDynamicOpenPrice: ",dynamicOpenPrice,"\nAccumulateLotSize: ",accLot);
       
-   }else if(signal=="buy" && currentTick.ask<=NextBuyPrice && lastestOpenTime + 3600 <= currentTick.time){
+   }else if(signal=="buy" && currentTick.ask<=NextBuyPrice && lastestOpenTime + InpPeriod <= currentTick.time){
       
       LotSizeUpdate();
       trade.Buy(lastestLotSize,NULL,currentTick.ask,0,0,NULL);
@@ -119,21 +114,7 @@ bool CloseOrder(long &type){
       return false;
    }
    double netProfit = 0; 
-   //if(type==POSITION_TYPE_BUY){
-   //   for(int i = 0;i<totalTicket;i++){
-   //      PositionSelectByTicket(ticketArr[i]);
-   //      netProfit += PositionGetDouble(POSITION_VOLUME) *levarage* (currentTick.ask-PositionGetDouble(POSITION_PRICE_OPEN));
-   //      accLot += PositionGetDouble(POSITION_VOLUME);
-   //   }
-   //}else if(type==POSITION_TYPE_SELL){
-   //   for(int i = 0;i<totalTicket;i++){
-   //      PositionSelectByTicket(ticketArr[i]);
-   //      netProfit += PositionGetDouble(POSITION_VOLUME) *levarage* (PositionGetDouble(POSITION_PRICE_OPEN)-currentTick.bid);
-   //      accLot += PositionGetDouble(POSITION_VOLUME);
-   //   }
-   //}else{
-   //   return false;
-   //}
+
    if(type==POSITION_TYPE_BUY){
       netProfit = (currentTick.ask - dynamicOpenPrice)*accLot*levarage;
    }else if(type==POSITION_TYPE_SELL){
@@ -163,32 +144,6 @@ string RandomSignal(){
       return "sell";
    }
 }
-
-//string SignalFromPast(){
-//   int totalTicket = PositionsTotal();
-//   ulong lastestTicket = PositionGetTicket(totalTicket-1);
-//   
-//   if(lastestTicket<=0){Print("Failed to get ticket");return NULL;}
-//   
-//   if(!PositionSelectByTicket(lastestTicket)){Print("Failed to select position");return NULL;}
-//   
-//   long magic;
-//   if(!PositionGetInteger(POSITION_MAGIC,magic)){Print("Failed to get magic");return NULL;}
-//   
-//   if(magic==InpMagicnumber){
-//      long type;
-//      if(!PositionGetInteger(POSITION_TYPE,type)){Print("Failed to get type");return NULL;}
-//   
-//      if(type==POSITION_TYPE_BUY){
-//         return "buy";
-//      }
-//      else if(type==POSITION_TYPE_SELL){
-//         return "sell";
-//      }else{
-//         return NULL;
-//      }
-//   }
-//}
 
 bool GetAllTicket(ulong& ticketArr[],long& type){
    int totalTicket = PositionsTotal();
