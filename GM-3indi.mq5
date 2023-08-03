@@ -146,6 +146,7 @@ int OnInit(){
    handleHardSto = iStochastic(NULL,PERIOD_D1,InpHardStoKPeriod,InpHardStoDPeriod,InpHardStoSlowing,InpHardStoMAMethod,InpHardStoPrice);
    ArrayResize(hardStoMainBuffer,1);
    ArrayResize(hardStoSignalBuffer,1);
+   
    return(INIT_SUCCEEDED);
 }
 
@@ -162,7 +163,7 @@ void OnTick(){
    if(!buyStatus){NextBuyPrice=currentTick.ask;}
    if(!sellStatus){NextSellPrice=currentTick.bid;}
    
-   if(currentTick.ask<=NextBuyPrice && lastestBuyTime + InpPeriod <= currentTick.time && ( buyStatus || buySignal )){
+   if(currentTick.ask<=NextBuyPrice && lastestBuyTime + InpPeriod <= currentTick.time && buySignal ){
       LotSizeUpdate("buy");
       
       trade.Buy(lastestBuyLotSize,NULL,currentTick.ask,0,0,NULL);
@@ -174,7 +175,7 @@ void OnTick(){
       buyStatus = true;
    }
    
-   if(currentTick.bid>=NextSellPrice && lastestSellTime + InpPeriod <= currentTick.time && ( sellStatus || sellSignal )){
+   if(currentTick.bid>=NextSellPrice && lastestSellTime + InpPeriod <= currentTick.time && sellSignal ){
       LotSizeUpdate("sell");
       
       trade.Sell(lastestSellLotSize,NULL,currentTick.bid,0,0,NULL);
@@ -387,15 +388,15 @@ void UpdateIndicatorBuffer(){
 }
 
 void SignalByIndicator(){
-   HardStoSignal();
+   //HardStoSignal();
    StoSignal();
-   RSISignal();
-   CCISignal();
+   //RSISignal();
+   //CCISignal();
    MACDSignal();
-   buySignal = hardStoBuySignal && stoBuySignal && rsiBuySignal && cciBuySignal && macdBuySignal;
-   sellSignal = hardStoSellSignal && stoSellSignal && rsiSellSignal && cciSellSignal && macdSellSignal;
-   //buySignal = stoBuySignal && macdBuySignal;
-   //sellSignal = stoSellSignal && macdSellSignal;
+   //buySignal = hardStoBuySignal && stoBuySignal && rsiBuySignal && cciBuySignal && macdBuySignal;
+   //sellSignal = hardStoSellSignal && stoSellSignal && rsiSellSignal && cciSellSignal && macdSellSignal;
+   buySignal = stoBuySignal && macdBuySignal;
+   sellSignal = stoSellSignal && macdSellSignal;
 }
 
 void HardStoSignal(){
