@@ -79,10 +79,10 @@ bool sellSignal;
 bool sellStatus;
 
 int handleSto;
-double stoMainBuffer[];
 bool stoBuySignal;
 bool stoSellSignal;
-double stoTempBuffer[];
+double stoMainBuffer[];
+double stoMainTempBuffer[];
 double stoSignalBuffer[];
 
 int handleRSI;
@@ -98,11 +98,14 @@ bool cciSellSignal;
 int handleMACD;
 double macdMainBuffer[];
 double macdMainTempBuffer[];
+double macdSignalBuffer[];
+double macdSignalTempBuffer[];
 bool macdBuySignal;
 bool macdSellSignal;
 
 int handleHardSto;
-double hardstoMainBuffer[];
+double hardStoMainBuffer[];
+double hardStoSignalBuffer[];
 bool hardStoSellSignal;
 bool hardStoBuySignal;
 
@@ -125,7 +128,7 @@ int OnInit(){
 
    handleSto = iStochastic( NULL,PERIOD_H1,InpStoKPeriod,InpStoDPeriod,InpStoSlowing,InpStoMAMethod,InpStoPrice ); 
    ArrayResize(stoMainBuffer,1);
-   ArrayResize(stoTempBuffer,1);
+   ArrayResize(stoMainTempBuffer,1);
    ArrayResize(stoSignalBuffer,1);
    
    handleRSI = iRSI(NULL,PERIOD_H1,InpRSIMAPeriod,InpRSIAppPrice);
@@ -137,10 +140,12 @@ int OnInit(){
    handleMACD = iMACD(NULL,PERIOD_H1,InpMACDFastPeriod,InpMACDSlowPeriod,InpMACDSignalPeriod,InpMACDAppPrice);
    ArrayResize(macdMainBuffer,1);
    ArrayResize(macdMainTempBuffer,1);
+   ArrayResize(macdSignalBuffer,1);
+   ArrayResize(macdSignalTempBuffer,1);
    
    handleHardSto = iStochastic(NULL,PERIOD_D1,InpHardStoKPeriod,InpHardStoDPeriod,InpHardStoSlowing,InpHardStoMAMethod,InpHardStoPrice);
-   ArrayResize(hardstoMainBuffer,5);
-
+   ArrayResize(hardStoMainBuffer,1);
+   ArrayResize(hardStoSignalBuffer,1);
    return(INIT_SUCCEEDED);
 }
 
@@ -182,14 +187,17 @@ void OnTick(){
    }
 
    Comment("Ask: ",currentTick.ask," NextBuyPrice: ",NextBuyPrice," DynamicBuyPrice: ",dynamicBuyPrice," accBuyLot: ",accBuyLot,
-         "\nBid: ",currentTick.bid," NextSellPrice: ",NextSellPrice," DynamicSellPrice: ",dynamicSellPrice," accSellLot: ",accSellLot,
-         "\n",stoTempBuffer[0]," ",//stoTempBuffer[1]," ",stoTempBuffer[2]," ",stoTempBuffer[3],
-         "\n",MathRound(macdMainTempBuffer[0],6)," ",MathRound(macdMainTempBuffer[1],6)," ",MathRound(macdMainTempBuffer[2],6)," ",MathRound(macdMainTempBuffer[3],6)," ",MathRound(macdMainTempBuffer[4],6)," ",MathRound(macdMainTempBuffer[5],6),
-         "\n",rsiBuffer[0],
-         "\n",cciBuffer[0],
-         "\n",stoMainBuffer[0],//,stoMainBuffer[1]," ",stoMainBuffer[2]," ",stoMainBuffer[3]," ",stoMainBuffer[4]," ",stoMainBuffer[5]," ",stoMainBuffer[6]
-         "\n",stoSignalBuffer[0]
+         "\nBid: ",currentTick.bid," NextSellPrice: ",NextSellPrice," DynamicSellPrice: ",dynamicSellPrice," accSellLot: ",accSellLot
          );
+         //"\n",stoMainTempBuffer[0]," ",//stoMainTempBuffer[1]," ",stoMainTempBuffer[2]," ",stoMainTempBuffer[3],
+         //"\n",MathRound(macdMainTempBuffer[0],6)," ",MathRound(macdMainTempBuffer[1],6)," ",MathRound(macdMainTempBuffer[2],6)," ",MathRound(macdMainTempBuffer[3],6)," ",MathRound(macdMainTempBuffer[4],6)," ",MathRound(macdMainTempBuffer[5],6),
+         //"\n",rsiBuffer[0],
+         //"\n",cciBuffer[0],
+         //"\n",stoMainBuffer[0],//,stoMainBuffer[1]," ",stoMainBuffer[2]," ",stoMainBuffer[3]," ",stoMainBuffer[4]," ",stoMainBuffer[5]," ",stoMainBuffer[6]
+         //"\n",stoSignalBuffer[0],
+         //"\n",macdMainBuffer[0]," ",macdSignalBuffer[0],
+         //"\n",macdMainTempBuffer[0]," ",macdSignalTempBuffer[0]
+         //);
          //"\nhardStoBuySignal: ",hardStoBuySignal," hardStoSellSignal: ",hardStoSellSignal,
          //"\nstoBuySignal: ",stoBuySignal," stoSellSignal: ",stoSellSignal,
          //"\nrsiBuySignal: ",rsiBuySignal," rsiSellSignal: ",rsiSellSignal,
@@ -362,19 +370,20 @@ bool GetAllTicket(ulong& ticketBuyArr[],ulong& ticketSellArr[]){
 }
 
 void UpdateIndicatorBuffer(){
+   ArrayCopy( stoMainBuffer,stoMainTempBuffer );
    CopyBuffer( handleSto,MAIN_LINE,0,1,stoMainBuffer );
    CopyBuffer( handleSto,SIGNAL_LINE,0,1,stoSignalBuffer );
 
    CopyBuffer( handleRSI,MAIN_LINE,0,1,rsiBuffer );
    CopyBuffer( handleCCI,MAIN_LINE,0,1,cciBuffer );
    
-   
    ArrayCopy( macdMainTempBuffer,macdMainBuffer );
    ArrayCopy( macdSignalTempBuffer,macdSignalBuffer );
    CopyBuffer( handleMACD,MAIN_LINE,0,1,macdMainBuffer );
    CopyBuffer( handleMACD,SIGNAL_LINE,0,1,macdSignalBuffer );
    
-   CopyBuffer( handleHardSto,MAIN_LINE,0,5,hardstoMainBuffer );
+   CopyBuffer( handleHardSto,MAIN_LINE,0,1,hardStoMainBuffer );
+   CopyBuffer( handleHardSto,SIGNAL_LINE,0,1,hardStoSignalBuffer );
 }
 
 void SignalByIndicator(){
@@ -382,31 +391,44 @@ void SignalByIndicator(){
    StoSignal();
    RSISignal();
    CCISignal();
-   buySignal = hardStoBuySignal && stoBuySignal && rsiBuySignal && cciBuySignal;
-   sellSignal = hardStoSellSignal && stoSellSignal && rsiSellSignal && cciSellSignal;
+   MACDSignal();
+   buySignal = hardStoBuySignal && stoBuySignal && rsiBuySignal && cciBuySignal && macdBuySignal;
+   sellSignal = hardStoSellSignal && stoSellSignal && rsiSellSignal && cciSellSignal && macdSellSignal;
+   //buySignal = stoBuySignal && macdBuySignal;
+   //sellSignal = stoSellSignal && macdSellSignal;
 }
 
 void HardStoSignal(){
    hardStoBuySignal = true;
    hardStoSellSignal = true;
-   if( hardstoMainBuffer[0] >= InpHardStoUpper || hardstoMainBuffer[1] >= InpHardStoUpper ){
+   if( hardStoMainBuffer[0] >= InpHardStoUpper || hardStoSignalBuffer[0] >= InpHardStoUpper ){
       hardStoBuySignal = false;
-   }else if( hardstoMainBuffer[0] <= InpHardStoLower || hardstoMainBuffer[1] <= InpHardStoLower ){
+   }else if( hardStoMainBuffer[0] <= InpHardStoLower || hardStoSignalBuffer[0] <= InpHardStoLower ){
       hardStoSellSignal = false;
    }
 }
 
 void StoSignal(){
-   stoBuySignal = false;
-   stoSellSignal = false;
-
-   //if(stoTempBuffer[1] <= stoTempBuffer[0] && stoMainBuffer[1] > stoMainBuffer[0] && stoMainBuffer[0] < InpStoUpper && stoMainBuffer[1] < InpStoUpper){
-   //   stoBuySignal = true;
-   //}
-   //if( stoTempBuffer[1] >= stoTempBuffer[0] && stoMainBuffer[1] < stoMainBuffer[0] && stoMainBuffer[0] > InpStoLower && stoMainBuffer[1] > InpStoLower ){
-   //   stoSellSignal = true;
-   //}
+   stoBuySignal = true;
+   stoSellSignal = true;
    
+   if(stoMainBuffer[0] >= InpStoUpper || stoSignalBuffer[0] >= InpStoUpper ){
+      stoBuySignal = false;
+   }
+   else if( stoMainBuffer[0] <= InpStoLower || stoSignalBuffer[0] <= InpStoLower ){
+      stoSellSignal = false;
+   }
+}
+
+void MACDSignal(){
+   macdBuySignal = false;
+   macdSellSignal = false;
+   if( macdMainBuffer[0] < InpMACDUpper && macdSignalBuffer[0] < InpMACDUpper && macdMainTempBuffer[0] <= macdSignalTempBuffer[0] && macdMainBuffer[0] > macdSignalBuffer[0] ){
+      macdBuySignal = true;
+   }
+   else if( macdMainBuffer[0] > InpMACDLower && macdSignalBuffer[0] > InpMACDLower && macdMainTempBuffer[0] >= macdSignalTempBuffer[0] && macdMainBuffer[0] < macdSignalBuffer[0] ){
+      macdSellSignal = true;
+   }
 }
 
 void RSISignal(){
