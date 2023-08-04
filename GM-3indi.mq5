@@ -26,28 +26,32 @@ input int            InpStoDPeriod  = 3;              // Sto D-period (period of
 input int            InpStoSlowing  = 3;              // Sto final smoothing
 input ENUM_MA_METHOD InpStoMAMethod = MODE_SMA;       // Sto type of smoothing (0 SMA,1 EMA,2 SMMA,3 LWMA )
 input ENUM_STO_PRICE InpStoPrice    = STO_LOWHIGH;    // Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
-input double         InpStoLower    = 20;             // Sto
-input double         InpStoUpper    = 80;             // Sto
+input double         InpStoLower    = 20;             // Sto lower
+input double         InpStoUpper    = 80;             // Sto upper
+input bool           InpStoActive   = true;           // Sto active
 
 
 input int                  InpRSIMAPeriod = 14;             // RSI averaging period
 input ENUM_APPLIED_PRICE   InpRSIAppPrice = PRICE_CLOSE;    // RSI type of price or handle
-input double               InpRSILower    = 30;             // RSI
-input double               InpRSIUpper    = 70;             // RSI
+input double               InpRSILower    = 30;             // RSI lower
+input double               InpRSIUpper    = 70;             // RSI upper
+input bool                 InpRSIActive   = true;           // RSI active
 
 
 input int                  InpCCIMAPeriod = 14;             // CCI averaging period
 input ENUM_APPLIED_PRICE   InpCCIAppPrice = PRICE_TYPICAL;  // CCI type of price or handle
-input double               InpCCILower    = -100;           // CCI
-input double               InpCCIUpper    = 100;            // CCI
+input double               InpCCILower    = -100;           // CCI lower
+input double               InpCCIUpper    = 100;            // CCI upper
+input bool                 InpCCIActive   = true;           // CCI active
 
 
 input int                  InpMACDFastPeriod    = 12;             // MACD period for Fast average calculation
 input int                  InpMACDSlowPeriod    = 26;             // MACD period for Slow average calculation
 input int                  InpMACDSignalPeriod  = 9;              // MACD period for their difference averaging
 input ENUM_APPLIED_PRICE   InpMACDAppPrice      = PRICE_CLOSE;    // MACD type of price or handle
-input double               InpMACDLower         = -0.000750;      // MACD
-input double               InpMACDUpper         = 0.000750;       // MACD
+input double               InpMACDLower         = -0.000750;      // MACD lower
+input double               InpMACDUpper         = 0.000750;       // MACD upper
+input bool                 InpMACDActive        = true;           // MACD active
 
 
 input int            InpHardStoKPeriod  = 5;             // D1 Sto K-period (number of bars for calculations)
@@ -55,9 +59,9 @@ input int            InpHardStoDPeriod  = 3;             // D1 Sto D-period (per
 input int            InpHardStoSlowing  = 3;             // D1 Sto final smoothing
 input ENUM_MA_METHOD InpHardStoMAMethod = MODE_SMA;      // D1 Sto type of smoothing (0 SMA,1 EMA,2 SMMA,3 LWMA )
 input ENUM_STO_PRICE InpHardStoPrice    = STO_LOWHIGH;   // D1 Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
-input double         InpHardStoLower    = 20;            // D1 Sto
-input double         InpHardStoUpper    = 80;            // D1 Sto
-
+input double         InpHardStoLower    = 20;            // D1 Sto lower
+input double         InpHardStoUpper    = 80;            // D1 Sto upper
+input bool           InpHardStoActive   = true;          // D1 Sto active
 
 CTrade trade;
 MqlTick currentTick;
@@ -166,8 +170,8 @@ void OnTick(){
    if(currentTick.ask<=NextBuyPrice && lastestBuyTime + InpPeriod <= currentTick.time && buySignal ){
       LotSizeUpdate("buy");
       
-      trade.Buy(lastestBuyLotSize,NULL,currentTick.ask,0,0,NULL);
-      
+      trade.Buy(lastestBuyLotSize,NULL,currentTick.ask,currentTick.ask - InpStopLoss*_Point,0,NULL);
+      //trade.Buy
       dynamicBuyPrice = ( dynamicBuyPrice*accBuyLot + currentTick.ask*lastestBuyLotSize )/(accBuyLot + lastestBuyLotSize);
       accBuyLot += lastestBuyLotSize;
       NextBuyPrice = currentTick.ask - InpGridStep * _Point;
@@ -178,7 +182,7 @@ void OnTick(){
    if(currentTick.bid>=NextSellPrice && lastestSellTime + InpPeriod <= currentTick.time && sellSignal ){
       LotSizeUpdate("sell");
       
-      trade.Sell(lastestSellLotSize,NULL,currentTick.bid,0,0,NULL);
+      trade.Sell(lastestSellLotSize,NULL,currentTick.bid,currentTick.bid + InpStopLoss*_Point,0,NULL);
       
       dynamicSellPrice = ( dynamicSellPrice*accSellLot + currentTick.bid*lastestSellLotSize )/(accSellLot + lastestSellLotSize);
       accSellLot += lastestSellLotSize;
@@ -269,7 +273,7 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
    
    if(type==POSITION_TYPE_BUY){
       netProfit = (currentTick.ask - dynamicBuyPrice);
-      if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accBuyLot || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot )){
+      if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accBuyLot ){// || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot )){
          for(int i = 0;i<totalTicket;i++){
             trade.PositionClose(ticketArr[i]);
          }
@@ -388,15 +392,23 @@ void UpdateIndicatorBuffer(){
 }
 
 void SignalByIndicator(){
-   //HardStoSignal();
+   HardStoSignal();
    StoSignal();
-   //RSISignal();
-   //CCISignal();
+   RSISignal();
+   CCISignal();
    MACDSignal();
-   //buySignal = hardStoBuySignal && stoBuySignal && rsiBuySignal && cciBuySignal && macdBuySignal;
-   //sellSignal = hardStoSellSignal && stoSellSignal && rsiSellSignal && cciSellSignal && macdSellSignal;
-   buySignal = stoBuySignal && macdBuySignal;
-   sellSignal = stoSellSignal && macdSellSignal;
+   buySignal = ( hardStoBuySignal || !InpHardStoActive ) && 
+               ( stoBuySignal || !InpStoActive ) && 
+               ( rsiBuySignal || !InpRSIActive ) && 
+               ( cciBuySignal || !InpCCIActive ) &&
+               ( macdBuySignal || !InpMACDActive );
+   sellSignal = ( hardStoSellSignal || !InpHardStoActive ) && 
+                ( stoSellSignal || !InpStoActive ) && 
+                ( rsiSellSignal || !InpRSIActive ) && 
+                ( cciSellSignal || !InpCCIActive ) && 
+                ( macdSellSignal || !InpMACDActive );
+   //buySignal = stoBuySignal && macdBuySignal;
+   //sellSignal = stoSellSignal && macdSellSignal;
 }
 
 void HardStoSignal(){
