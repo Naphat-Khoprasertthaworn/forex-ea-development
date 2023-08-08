@@ -170,7 +170,7 @@ void OnTick(){
    if(currentTick.ask<=NextBuyPrice && lastestBuyTime + InpPeriod <= currentTick.time && buySignal ){
       LotSizeUpdate("buy");
       
-      trade.Buy(lastestBuyLotSize,NULL,currentTick.ask,currentTick.ask - InpStopLoss*_Point,0,NULL);
+      trade.Buy(lastestBuyLotSize,NULL,currentTick.ask,0,0,NULL);
       //trade.Buy
       dynamicBuyPrice = ( dynamicBuyPrice*accBuyLot + currentTick.ask*lastestBuyLotSize )/(accBuyLot + lastestBuyLotSize);
       accBuyLot += lastestBuyLotSize;
@@ -182,7 +182,7 @@ void OnTick(){
    if(currentTick.bid>=NextSellPrice && lastestSellTime + InpPeriod <= currentTick.time && sellSignal ){
       LotSizeUpdate("sell");
       
-      trade.Sell(lastestSellLotSize,NULL,currentTick.bid,currentTick.bid + InpStopLoss*_Point,0,NULL);
+      trade.Sell(lastestSellLotSize,NULL,currentTick.bid,0,0,NULL);
       
       dynamicSellPrice = ( dynamicSellPrice*accSellLot + currentTick.bid*lastestSellLotSize )/(accSellLot + lastestSellLotSize);
       accSellLot += lastestSellLotSize;
@@ -273,7 +273,13 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
    
    if(type==POSITION_TYPE_BUY){
       netProfit = (currentTick.ask - dynamicBuyPrice);
-      if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accBuyLot ){// || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot )){
+      
+      if( InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot ){
+         Print("Buy - Stop Loss active");
+      }
+      
+      //if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accBuyLot  || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot )){
+      if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accBuyLot  || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point) )){
          for(int i = 0;i<totalTicket;i++){
             trade.PositionClose(ticketArr[i]);
          }
@@ -288,7 +294,13 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
 
    }else if(type==POSITION_TYPE_SELL){
       netProfit = (dynamicSellPrice - currentTick.bid);
-      if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accSellLot || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accSellLot )){
+      
+      if( InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot ){
+         Print("Sell - Stop Loss active");
+      }
+      
+      //if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accSellLot || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accSellLot )){
+      if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accSellLot || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point) )){
          for(int i = 0;i<totalTicket;i++){
             trade.PositionClose(ticketArr[i]);
          }
