@@ -17,9 +17,10 @@ input int            InpTakeProfit  = 150;      // take profit in points (point)
 input int            InpGridStep    = 150;      // step in grid system (point)
 input double         InpMaxLotSize  = 0.15;     // max lot size
 input double         InpLotMultiply = 1.5;      // multiply lot size
-//input double         InpPercentTP   = 30;       // percent for greedy! [0-100]
+input double         InpPercentTP   = 30;       // percent for greedy! [0-100]
 input int            InpMATicket    = 4;        // InpMATicket (Integer+)
 input int            InpStopLoss    = 0;        // stop loss in points (point) (0=off)
+input double         InpMaxAccLot   = 1;        // ex. InpMaxAccLot = 1 is max of accButLot and accSellLot = 0.5
 
 input int            InpStoKPeriod  = 5;              // Sto K-period (number of bars for calculations)
 input int            InpStoDPeriod  = 3;              // Sto D-period (period of first smoothing)
@@ -28,29 +29,30 @@ input ENUM_MA_METHOD InpStoMAMethod = MODE_SMA;       // Sto type of smoothing (
 input ENUM_STO_PRICE InpStoPrice    = STO_LOWHIGH;    // Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
 input double         InpStoLower    = 20;             // Sto lower
 input double         InpStoUpper    = 80;             // Sto upper
-input bool           InpStoActive   = true;           // Sto active
+input bool           InpStoActive   = false;           // Sto active
 
 
 input int                  InpRSIMAPeriod = 14;             // RSI averaging period
 input ENUM_APPLIED_PRICE   InpRSIAppPrice = PRICE_CLOSE;    // RSI type of price or handle
 input double               InpRSILower    = 30;             // RSI lower
 input double               InpRSIUpper    = 70;             // RSI upper
-input bool                 InpRSIActive   = true;           // RSI active
+input bool                 InpRSIActive   = false;           // RSI active
 
 
 input int                  InpCCIMAPeriod = 14;             // CCI averaging period
 input ENUM_APPLIED_PRICE   InpCCIAppPrice = PRICE_TYPICAL;  // CCI type of price or handle
 input double               InpCCILower    = -100;           // CCI lower
 input double               InpCCIUpper    = 100;            // CCI upper
-input bool                 InpCCIActive   = true;           // CCI active
+input bool                 InpCCIActive   = false;           // CCI active
 
 
 input int                  InpMACDFastPeriod    = 12;             // MACD period for Fast average calculation
 input int                  InpMACDSlowPeriod    = 26;             // MACD period for Slow average calculation
 input int                  InpMACDSignalPeriod  = 9;              // MACD period for their difference averaging
 input ENUM_APPLIED_PRICE   InpMACDAppPrice      = PRICE_CLOSE;    // MACD type of price or handle
-input double               InpMACDLower         = -0.000750;      // MACD lower
-input double               InpMACDUpper         = 0.000750;       // MACD upper
+input double               InpMACDLevel         = 0.000750;       // MACD level (lower = 0-level , upper = 0+level)
+//input double               InpMACDLower         = -0.000750;      // MACD lower
+//input double               InpMACDUpper         = 0.000750;       // MACD upper
 input bool                 InpMACDActive        = true;           // MACD active
 
 
@@ -61,7 +63,7 @@ input ENUM_MA_METHOD InpHardStoMAMethod = MODE_SMA;      // D1 Sto type of smoot
 input ENUM_STO_PRICE InpHardStoPrice    = STO_LOWHIGH;   // D1 Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
 input double         InpHardStoLower    = 20;            // D1 Sto lower
 input double         InpHardStoUpper    = 80;            // D1 Sto upper
-input bool           InpHardStoActive   = true;          // D1 Sto active
+input bool           InpHardStoActive   = false;          // D1 Sto active
 
 CTrade trade;
 MqlTick currentTick;
@@ -167,11 +169,11 @@ void OnTick(){
    if(!buyStatus){NextBuyPrice=currentTick.ask;}
    if(!sellStatus){NextSellPrice=currentTick.bid;}
    
-   if(currentTick.ask<=NextBuyPrice && lastestBuyTime + InpPeriod <= currentTick.time && buySignal ){
+   if(currentTick.ask<=NextBuyPrice && lastestBuyTime + InpPeriod <= currentTick.time && buySignal && accBuyLot < InpMaxAccLot/2 ){
       LotSizeUpdate("buy");
       
       trade.Buy(lastestBuyLotSize,NULL,currentTick.ask,0,0,NULL);
-      //trade.Buy
+
       dynamicBuyPrice = ( dynamicBuyPrice*accBuyLot + currentTick.ask*lastestBuyLotSize )/(accBuyLot + lastestBuyLotSize);
       accBuyLot += lastestBuyLotSize;
       NextBuyPrice = currentTick.ask - InpGridStep * _Point;
@@ -179,7 +181,7 @@ void OnTick(){
       buyStatus = true;
    }
    
-   if(currentTick.bid>=NextSellPrice && lastestSellTime + InpPeriod <= currentTick.time && sellSignal ){
+   if(currentTick.bid>=NextSellPrice && lastestSellTime + InpPeriod <= currentTick.time && sellSignal && accSellLot < InpMaxAccLot/2 ){
       LotSizeUpdate("sell");
       
       trade.Sell(lastestSellLotSize,NULL,currentTick.bid,0,0,NULL);
@@ -211,16 +213,22 @@ void OnTick(){
 
 void LotSizeUpdate(string cmd){
    if(cmd=="buy"){
-      if(lastestBuyLotSize ==0){
+      if(lastestBuyLotSize == 0){
          lastestBuyLotSize = InpLotSize;
       }else{
          lastestBuyLotSize = (lastestBuyLotSize*InpLotMultiply > InpMaxLotSize) ? InpMaxLotSize : (double)((ceil(lastestBuyLotSize*InpLotMultiply*100))/100);
       }
+      if( lastestBuyLotSize + accBuyLot > InpMaxAccLot / 2 ){
+         lastestBuyLotSize = (InpMaxAccLot / 2) - accBuyLot;
+      }
    }else{
-      if(lastestSellLotSize ==0){
+      if(lastestSellLotSize == 0){
          lastestSellLotSize = InpLotSize;
       }else{
          lastestSellLotSize = (lastestSellLotSize*InpLotMultiply > InpMaxLotSize) ? InpMaxLotSize : (double)((ceil(lastestSellLotSize*InpLotMultiply*100))/100);
+      }
+      if( lastestSellLotSize + accSellLot > InpMaxAccLot / 2 ){
+         lastestSellLotSize = (InpMaxAccLot / 2) - accSellLot;
       }
    }
 }
@@ -295,7 +303,7 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
    }else if(type==POSITION_TYPE_SELL){
       netProfit = (dynamicSellPrice - currentTick.bid);
       
-      if( InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot ){
+      if( InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accSellLot ){
          Print("Sell - Stop Loss active");
       }
       
@@ -342,8 +350,8 @@ bool CloseOrderReduceDrawdown(ulong& ticketArr[]){
          accLot = accSellLot;
       }
       
-      //if(profit >= InpTakeProfit*_Point*(firstLotSize + lastLotSize)*(InpPercentTP/100) ){
-      if(profit >= InpTakeProfit*_Point*(firstLotSize + lastLotSize)/(accLot) ){
+      if(profit >= InpTakeProfit*_Point*(firstLotSize + lastLotSize)*(InpPercentTP/100) ){
+      //if(profit >= InpTakeProfit*_Point*(firstLotSize + lastLotSize)/(accLot) ){
          trade.PositionClose(ticketArr[ ArraySize(ticketArr)-1 ]);
          trade.PositionClose(ticketArr[ 0 ]);
          ArrayRemove(ticketArr, 0 ,1);
@@ -451,10 +459,10 @@ void StoSignal(){
 void MACDSignal(){
    macdBuySignal = false;
    macdSellSignal = false;
-   if( macdMainBuffer[0] < InpMACDUpper && macdSignalBuffer[0] < InpMACDUpper && macdMainTempBuffer[0] <= macdSignalTempBuffer[0] && macdMainBuffer[0] > macdSignalBuffer[0] ){
+   if( macdMainBuffer[0] < InpMACDLevel && macdSignalBuffer[0] < InpMACDLevel && macdMainTempBuffer[0] <= macdSignalTempBuffer[0] && macdMainBuffer[0] > macdSignalBuffer[0] ){
       macdBuySignal = true;
    }
-   else if( macdMainBuffer[0] > InpMACDLower && macdSignalBuffer[0] > InpMACDLower && macdMainTempBuffer[0] >= macdSignalTempBuffer[0] && macdMainBuffer[0] < macdSignalBuffer[0] ){
+   else if( macdMainBuffer[0] > -InpMACDLevel && macdSignalBuffer[0] > -InpMACDLevel && macdMainTempBuffer[0] >= macdSignalTempBuffer[0] && macdMainBuffer[0] < macdSignalBuffer[0] ){
       macdSellSignal = true;
    }
 }
