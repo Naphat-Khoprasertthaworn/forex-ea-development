@@ -13,14 +13,14 @@ static input long    InpMagicnumber = 234234;   // magic number (Integer+)
 
 input double         InpLotSize     = 0.01;     // lot size
 input int            InpPeriod      = 3600;     // period (sec)
-input int            InpTakeProfit  = 150;      // take profit in points (point) (0=off)
+input int            InpTakeProfit  = 340;      // take profit in points (point) (0=off)
 input int            InpGridStep    = 150;      // step in grid system (point)
-input double         InpMaxLotSize  = 0.15;     // max lot size
-input double         InpLotMultiply = 1.5;      // multiply lot size
+input double         InpMaxLotSize  = 100;     // max lot size
+input double         InpLotMultiply = 2;      // multiply lot size
 input double         InpPercentTP   = 30;       // percent for greedy! [0-100]
 input int            InpMATicket    = 4;        // InpMATicket (Integer+)
 input int            InpStopLoss    = 0;        // stop loss in points (point) (0=off)
-input double         InpMaxAccLot   = 1;        // ex. InpMaxAccLot = 1 is max of accButLot and accSellLot = 0.5
+input double         InpMaxAccLot   = 2;        // ex. InpMaxAccLot = 1 is max of accButLot and accSellLot = 0.5
 
 input int            InpStoKPeriod  = 5;              // Sto K-period (number of bars for calculations)
 input int            InpStoDPeriod  = 3;              // Sto D-period (period of first smoothing)
@@ -246,22 +246,26 @@ void CloseOrder(){
    }
    
    if(buyStatus){
+      //Print("BUY");
       if(totalTicket > InpMATicket){
          if(CloseOrderReduceDrawdown(ticketBuyArr)){
             CloseOrderMAOpen(ticketBuyArr);
          }
-   }else{
-      CloseOrderMAOpen(ticketBuyArr);
+      }else{
+         CloseOrderMAOpen(ticketBuyArr);
       }
    }
    
    if(sellStatus){
+      
       if(totalTicket > InpMATicket){
          if(CloseOrderReduceDrawdown(ticketSellArr)){
             CloseOrderMAOpen(ticketSellArr);
          }
-   }else{
-      CloseOrderMAOpen(ticketSellArr);
+      }else{
+         //Print("THAT");
+         //Print(sellStatus,ArraySize(ticketSellArr));
+         CloseOrderMAOpen(ticketSellArr);
       }
    }
 }
@@ -272,7 +276,7 @@ long ticketArrType(ulong& ticketArr[]){
 }
 
 bool CloseOrderMAOpen(ulong& ticketArr[]){
-
+   //Print("MA");
    long type = ticketArrType(ticketArr);
 
    double netProfit = 0; 
@@ -325,7 +329,6 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
 }
 
 bool CloseOrderReduceDrawdown(ulong& ticketArr[]){
-
    long type = ticketArrType(ticketArr);
 
    while(true){
