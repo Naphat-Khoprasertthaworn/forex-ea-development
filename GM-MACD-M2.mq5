@@ -13,13 +13,14 @@ static input long    InpMagicnumber = 234234;   // magic number (Integer+)
 
 input double         InpLotSize     = 0.01;     // lot size
 input int            InpPeriod      = 3600;     // period (sec)
-input int            InpTakeProfit  = 150;      // take profit in points (point) (0=off)
+input int            InpTakeProfit  = 340;      // take profit in points (point) (0=off)
 input int            InpGridStep    = 150;      // step in grid system (point)
-input double         InpMaxLotSize  = 0.15;     // max lot size
-input double         InpLotMultiply = 1.5;      // multiply lot size
+input double         InpMaxLotSize  = 100;     // max lot size
+input double         InpLotMultiply = 2;      // multiply lot size
 input double         InpPercentTP   = 30;       // percent for greedy! [0-100]
 input int            InpMATicket    = 4;        // InpMATicket (Integer+)
 input int            InpStopLoss    = 0;        // stop loss in points (point) (0=off)
+input double         InpMaxAccLot   = 2;        // ex. InpMaxAccLot = 1 is max of accButLot and accSellLot = 0.5
 
 input int            InpStoKPeriod  = 5;              // Sto K-period (number of bars for calculations)
 input int            InpStoDPeriod  = 3;              // Sto D-period (period of first smoothing)
@@ -28,29 +29,29 @@ input ENUM_MA_METHOD InpStoMAMethod = MODE_SMA;       // Sto type of smoothing (
 input ENUM_STO_PRICE InpStoPrice    = STO_LOWHIGH;    // Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
 input double         InpStoLower    = 20;             // Sto lower
 input double         InpStoUpper    = 80;             // Sto upper
-input bool           InpStoActive   = true;           // Sto active
+input bool           InpStoActive   = false;           // Sto active
 
 
 input int                  InpRSIMAPeriod = 14;             // RSI averaging period
 input ENUM_APPLIED_PRICE   InpRSIAppPrice = PRICE_CLOSE;    // RSI type of price or handle
 input double               InpRSILower    = 30;             // RSI lower
 input double               InpRSIUpper    = 70;             // RSI upper
-input bool                 InpRSIActive   = true;           // RSI active
+input bool                 InpRSIActive   = false;           // RSI active
 
 
 input int                  InpCCIMAPeriod = 14;             // CCI averaging period
 input ENUM_APPLIED_PRICE   InpCCIAppPrice = PRICE_TYPICAL;  // CCI type of price or handle
 input double               InpCCILower    = -100;           // CCI lower
 input double               InpCCIUpper    = 100;            // CCI upper
-input bool                 InpCCIActive   = true;           // CCI active
+input bool                 InpCCIActive   = false;           // CCI active
 
 
 input int                  InpMACDFastPeriod    = 12;             // MACD period for Fast average calculation
 input int                  InpMACDSlowPeriod    = 26;             // MACD period for Slow average calculation
 input int                  InpMACDSignalPeriod  = 9;              // MACD period for their difference averaging
 input ENUM_APPLIED_PRICE   InpMACDAppPrice      = PRICE_CLOSE;    // MACD type of price or handle
-input double               InpMACDLower         = -0.000750;      // MACD lower
-input double               InpMACDUpper         = 0.000750;       // MACD upper
+input double               InpMACDLevel         = 0.004500;       // MACD level (lower = 0-level , upper = 0+level)
+input ENUM_TIMEFRAMES      InpMACDTimeFrame     = PERIOD_H1;       // MACD timeframe
 input bool                 InpMACDActive        = true;           // MACD active
 
 
@@ -61,7 +62,7 @@ input ENUM_MA_METHOD InpHardStoMAMethod = MODE_SMA;      // D1 Sto type of smoot
 input ENUM_STO_PRICE InpHardStoPrice    = STO_LOWHIGH;   // D1 Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
 input double         InpHardStoLower    = 20;            // D1 Sto lower
 input double         InpHardStoUpper    = 80;            // D1 Sto upper
-input bool           InpHardStoActive   = true;          // D1 Sto active
+input bool           InpHardStoActive   = false;          // D1 Sto active
 
 CTrade trade;
 MqlTick currentTick;
@@ -118,14 +119,14 @@ int OnInit(){
    
    accBuyLot = 0;
    dynamicBuyPrice = 0;
-   lastestBuyLotSize = 0;
+   lastestBuyLotSize = InpLotSize;
    lastestBuyTime = TimeCurrent();
    buyStatus = false;
    buySignal = false;
    
    accSellLot = 0;
    dynamicSellPrice = 0;
-   lastestSellLotSize = 0;
+   lastestSellLotSize = InpLotSize;
    lastestSellTime = TimeCurrent();
    sellStatus = false;
    sellSignal = false;
@@ -141,7 +142,7 @@ int OnInit(){
    handleCCI = iCCI(NULL,PERIOD_H1,InpCCIMAPeriod,InpCCIAppPrice);
    ArrayResize(cciBuffer,1);
    
-   handleMACD = iMACD(NULL,PERIOD_H1,InpMACDFastPeriod,InpMACDSlowPeriod,InpMACDSignalPeriod,InpMACDAppPrice);
+   handleMACD = iMACD(NULL,InpMACDTimeFrame,InpMACDFastPeriod,InpMACDSlowPeriod,InpMACDSignalPeriod,InpMACDAppPrice);
    ArrayResize(macdMainBuffer,1);
    ArrayResize(macdMainTempBuffer,1);
    ArrayResize(macdSignalBuffer,1);
@@ -167,28 +168,30 @@ void OnTick(){
    if(!buyStatus){NextBuyPrice=currentTick.ask;}
    if(!sellStatus){NextSellPrice=currentTick.bid;}
    
-   if(currentTick.ask<=NextBuyPrice && lastestBuyTime + InpPeriod <= currentTick.time && buySignal ){
-      LotSizeUpdate("buy");
-      
-      trade.Buy(lastestBuyLotSize,NULL,currentTick.ask,0,0,NULL);
-      //trade.Buy
-      dynamicBuyPrice = ( dynamicBuyPrice*accBuyLot + currentTick.ask*lastestBuyLotSize )/(accBuyLot + lastestBuyLotSize);
-      accBuyLot += lastestBuyLotSize;
-      NextBuyPrice = currentTick.ask - InpGridStep * _Point;
-      lastestBuyTime = currentTick.time;
-      buyStatus = true;
+   if(currentTick.ask<=NextBuyPrice && lastestBuyTime + InpPeriod <= currentTick.time && buySignal && accBuyLot + lastestBuyLotSize < InpMaxAccLot/2 ){
+
+      if(trade.Buy(lastestBuyLotSize,NULL,currentTick.ask,0,0,NULL)){
+         dynamicBuyPrice = ( dynamicBuyPrice*accBuyLot + currentTick.ask*lastestBuyLotSize )/(accBuyLot + lastestBuyLotSize);
+         accBuyLot += lastestBuyLotSize;
+         NextBuyPrice = currentTick.ask - InpGridStep * _Point;
+         lastestBuyTime = currentTick.time;
+         buyStatus = true;
+         LotSizeUpdate("buy");
+      }
+
+
    }
    
-   if(currentTick.bid>=NextSellPrice && lastestSellTime + InpPeriod <= currentTick.time && sellSignal ){
-      LotSizeUpdate("sell");
-      
-      trade.Sell(lastestSellLotSize,NULL,currentTick.bid,0,0,NULL);
-      
-      dynamicSellPrice = ( dynamicSellPrice*accSellLot + currentTick.bid*lastestSellLotSize )/(accSellLot + lastestSellLotSize);
-      accSellLot += lastestSellLotSize;
-      NextSellPrice = currentTick.bid + InpGridStep*_Point;
-      lastestSellTime = currentTick.time;
-      sellStatus = true;
+   if(currentTick.bid>=NextSellPrice && lastestSellTime + InpPeriod <= currentTick.time && sellSignal && accSellLot + lastestSellLotSize < InpMaxAccLot/2 ){
+
+      if(trade.Sell(lastestSellLotSize,NULL,currentTick.bid,0,0,NULL)){
+         dynamicSellPrice = ( dynamicSellPrice*accSellLot + currentTick.bid*lastestSellLotSize )/(accSellLot + lastestSellLotSize);
+         accSellLot += lastestSellLotSize;
+         NextSellPrice = currentTick.bid + InpGridStep*_Point;
+         lastestSellTime = currentTick.time;
+         sellStatus = true;
+         LotSizeUpdate("sell");
+      }
    }
 
    Comment("Ask: ",currentTick.ask," NextBuyPrice: ",NextBuyPrice," DynamicBuyPrice: ",dynamicBuyPrice," accBuyLot: ",accBuyLot,
@@ -211,17 +214,15 @@ void OnTick(){
 
 void LotSizeUpdate(string cmd){
    if(cmd=="buy"){
-      if(lastestBuyLotSize ==0){
-         lastestBuyLotSize = InpLotSize;
-      }else{
-         lastestBuyLotSize = (lastestBuyLotSize*InpLotMultiply > InpMaxLotSize) ? InpMaxLotSize : (double)((ceil(lastestBuyLotSize*InpLotMultiply*100))/100);
-      }
+      lastestBuyLotSize = (lastestBuyLotSize*InpLotMultiply > InpMaxLotSize) ? InpMaxLotSize : (double)((ceil(lastestBuyLotSize*InpLotMultiply*100))/100);
+      //if( lastestBuyLotSize + accBuyLot > InpMaxAccLot / 2 ){
+      //   lastestBuyLotSize = (InpMaxAccLot / 2) - accBuyLot;
+      //}
    }else{
-      if(lastestSellLotSize ==0){
-         lastestSellLotSize = InpLotSize;
-      }else{
-         lastestSellLotSize = (lastestSellLotSize*InpLotMultiply > InpMaxLotSize) ? InpMaxLotSize : (double)((ceil(lastestSellLotSize*InpLotMultiply*100))/100);
-      }
+      lastestSellLotSize = (lastestSellLotSize*InpLotMultiply > InpMaxLotSize) ? InpMaxLotSize : (double)((ceil(lastestSellLotSize*InpLotMultiply*100))/100);
+      //if( lastestSellLotSize + accSellLot > InpMaxAccLot / 2 ){
+      //   lastestSellLotSize = (InpMaxAccLot / 2) - accSellLot;
+      //}
    }
 }
 
@@ -242,18 +243,19 @@ void CloseOrder(){
          if(CloseOrderReduceDrawdown(ticketBuyArr)){
             CloseOrderMAOpen(ticketBuyArr);
          }
-   }else{
-      CloseOrderMAOpen(ticketBuyArr);
+      }else{
+         CloseOrderMAOpen(ticketBuyArr);
       }
    }
    
    if(sellStatus){
+      
       if(totalTicket > InpMATicket){
          if(CloseOrderReduceDrawdown(ticketSellArr)){
             CloseOrderMAOpen(ticketSellArr);
          }
-   }else{
-      CloseOrderMAOpen(ticketSellArr);
+      }else{
+         CloseOrderMAOpen(ticketSellArr);
       }
    }
 }
@@ -264,7 +266,6 @@ long ticketArrType(ulong& ticketArr[]){
 }
 
 bool CloseOrderMAOpen(ulong& ticketArr[]){
-
    long type = ticketArrType(ticketArr);
 
    double netProfit = 0; 
@@ -278,16 +279,27 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
          Print("Buy - Stop Loss active");
       }
       
-      //if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accBuyLot  || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot )){
-      if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accBuyLot  || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point) )){
+      if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accBuyLot  || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot )){
+         bool tempF = true;
          for(int i = 0;i<totalTicket;i++){
-            trade.PositionClose(ticketArr[i]);
+            PositionSelectByTicket( ticketArr[i] );
+            double tempO,tempL;
+            PositionGetDouble(POSITION_PRICE_OPEN,tempO);
+            PositionGetDouble(POSITION_VOLUME,tempL);
+            if(trade.PositionClose(ticketArr[i])){
+               dynamicBuyPrice = (dynamicBuyPrice*accBuyLot - tempO*tempL) / (accBuyLot - tempL);
+               accBuyLot -= tempL;
+            }else{
+               tempF = false;
+            }
          }
-         accBuyLot = 0;
-         dynamicBuyPrice = 0;
-         lastestBuyLotSize = 0;
-         buyStatus = false;
-         return true;
+         if(tempF){
+            accBuyLot = 0;
+            dynamicBuyPrice = 0;
+            lastestBuyLotSize = InpLotSize;
+            buyStatus = false;
+            return true;
+         }
       }else{
          return false;
       }
@@ -295,20 +307,32 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
    }else if(type==POSITION_TYPE_SELL){
       netProfit = (dynamicSellPrice - currentTick.bid);
       
-      if( InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot ){
+      if( InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accSellLot ){
          Print("Sell - Stop Loss active");
       }
       
-      //if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accSellLot || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accSellLot )){
-      if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accSellLot || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point) )){
+      if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accSellLot || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accSellLot )){
+         bool tempF = true;
          for(int i = 0;i<totalTicket;i++){
-            trade.PositionClose(ticketArr[i]);
+            PositionSelectByTicket( ticketArr[i] );
+            double tempO,tempL;
+            PositionGetDouble(POSITION_PRICE_OPEN,tempO);
+            PositionGetDouble(POSITION_VOLUME,tempL);
+            if(trade.PositionClose(ticketArr[i])){
+               dynamicSellPrice = (dynamicSellPrice*accSellLot - tempO*tempL) / (accSellLot - tempL);
+               accSellLot -= tempL;
+            }
+            else{
+               tempF = false;
+            }
          }
-         accSellLot = 0;
-         dynamicSellPrice = 0;
-         lastestSellLotSize = 0;
-         sellStatus = false;
-         return true;
+         if(tempF){
+            accSellLot = 0;
+            dynamicSellPrice = 0;
+            lastestSellLotSize = InpLotSize;
+            sellStatus = false;
+            return true;
+         }
       }else{
          return false;
       }
@@ -317,7 +341,6 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
 }
 
 bool CloseOrderReduceDrawdown(ulong& ticketArr[]){
-
    long type = ticketArrType(ticketArr);
 
    while(true){
@@ -333,24 +356,42 @@ bool CloseOrderReduceDrawdown(ulong& ticketArr[]){
       double firstOpenPrice = PositionGetDouble(POSITION_PRICE_OPEN);
       
       double profit = 0;
-
+      double accLot = 0;
       if(type==POSITION_TYPE_BUY){
          profit = ((currentTick.ask-lastOpenPrice)*lastLotSize + (currentTick.ask-firstOpenPrice)*firstLotSize);
+         accLot = accBuyLot;
       }else{
          profit = ((lastOpenPrice-currentTick.bid)*lastLotSize + (firstOpenPrice-currentTick.bid)*firstLotSize);
+         accLot = accSellLot;
       }
       
-      if(profit >= InpTakeProfit*_Point*(firstLotSize + lastLotSize)*(InpPercentTP/100) ){
-         trade.PositionClose(ticketArr[ ArraySize(ticketArr)-1 ]);
-         trade.PositionClose(ticketArr[ 0 ]);
-         ArrayRemove(ticketArr, 0 ,1);
-         ArrayRemove(ticketArr, ArraySize(ticketArr)-1 ,1);
+      double tpDD = 0;
+      if(InpPercentTP > 0){tpDD = InpTakeProfit*_Point*(firstLotSize + lastLotSize)*(InpPercentTP/100);}
+      else{tpDD = InpTakeProfit*_Point*(firstLotSize + lastLotSize)/(accLot);}
+      
+      if(profit >= tpDD ){
+         int tempFlagLast = 0;
+         if(trade.PositionClose(ticketArr[ ArraySize(ticketArr)-1 ])){
+            tempFlagLast = 1;
+            ArrayRemove(ticketArr, ArraySize(ticketArr)-1 ,1);
+         }
+         
+         int tempFlagFirst = 0;
+         if(trade.PositionClose(ticketArr[ 0 ])){
+            tempFlagFirst = 1;
+            ArrayRemove(ticketArr, 0 ,1);
+         }
+         
+         if(!tempFlagFirst && !tempFlagLast){
+            return false;
+         }
+         
          if(type==POSITION_TYPE_BUY){
-            dynamicBuyPrice = (dynamicBuyPrice*accBuyLot - lastOpenPrice*lastLotSize - firstOpenPrice*firstLotSize) / (accBuyLot - lastLotSize - firstLotSize);
-            accBuyLot = accBuyLot - firstLotSize - lastLotSize;
+            dynamicBuyPrice = (dynamicBuyPrice*accBuyLot - tempFlagLast*lastOpenPrice*lastLotSize - tempFlagFirst*firstOpenPrice*firstLotSize) / (accBuyLot - tempFlagLast*lastLotSize - tempFlagFirst*firstLotSize);
+            accBuyLot = accBuyLot - tempFlagFirst*firstLotSize - tempFlagLast*lastLotSize;
          }else{
-            dynamicSellPrice = (dynamicSellPrice*accSellLot - lastOpenPrice*lastLotSize - firstOpenPrice*firstLotSize) / (accSellLot - lastLotSize - firstLotSize);
-            accSellLot = accSellLot - firstLotSize - lastLotSize;
+            dynamicSellPrice = (dynamicSellPrice*accSellLot - tempFlagLast*lastOpenPrice*lastLotSize - tempFlagFirst*firstOpenPrice*firstLotSize) / (accSellLot - tempFlagLast*lastLotSize - tempFlagFirst*firstLotSize);
+            accSellLot = accSellLot - tempFlagFirst*firstLotSize - tempFlagLast*lastLotSize;
          }
       }else{
          return false;
@@ -419,8 +460,8 @@ void SignalByIndicator(){
                 ( rsiSellSignal || !InpRSIActive ) && 
                 ( cciSellSignal || !InpCCIActive ) && 
                 ( macdSellSignal || !InpMACDActive );
-   //buySignal = stoBuySignal && macdBuySignal;
-   //sellSignal = stoSellSignal && macdSellSignal;
+   //buySignal = macdBuySignal || !InpMACDActive;
+   //sellSignal = macdSellSignal || !InpMACDActive;
 }
 
 void HardStoSignal(){
@@ -448,10 +489,10 @@ void StoSignal(){
 void MACDSignal(){
    macdBuySignal = false;
    macdSellSignal = false;
-   if( macdMainBuffer[0] < InpMACDUpper && macdSignalBuffer[0] < InpMACDUpper && macdMainTempBuffer[0] <= macdSignalTempBuffer[0] && macdMainBuffer[0] > macdSignalBuffer[0] ){
+   if( macdMainBuffer[0] < InpMACDLevel && macdSignalBuffer[0] < InpMACDLevel && macdMainTempBuffer[0] <= macdSignalTempBuffer[0] && macdMainBuffer[0] > macdSignalBuffer[0] ){
       macdBuySignal = true;
    }
-   else if( macdMainBuffer[0] > InpMACDLower && macdSignalBuffer[0] > InpMACDLower && macdMainTempBuffer[0] >= macdSignalTempBuffer[0] && macdMainBuffer[0] < macdSignalBuffer[0] ){
+   else if( macdMainBuffer[0] > -InpMACDLevel && macdSignalBuffer[0] > -InpMACDLevel && macdMainTempBuffer[0] >= macdSignalTempBuffer[0] && macdMainBuffer[0] < macdSignalBuffer[0] ){
       macdSellSignal = true;
    }
 }
