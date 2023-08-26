@@ -27,7 +27,7 @@ input int            InpStoDPeriod  = 3;              // Sto D-period (period of
 input int            InpStoSlowing  = 3;              // Sto final smoothing
 input ENUM_MA_METHOD InpStoMAMethod = MODE_SMA;       // Sto type of smoothing (0 SMA,1 EMA,2 SMMA,3 LWMA )
 input ENUM_STO_PRICE InpStoPrice    = STO_LOWHIGH;    // Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
-input double         InpStoLevel    = 30;             // Sto Level (lower = 50 - level,upper = 50 + level)
+input double         InpStoLevel    = 20;             // Sto Level (lower = 50 - level,upper = 50 + level)
 input bool           InpStoActive   = false;           // Sto active
 
 input int                  InpRSIMAPeriod = 14;             // RSI averaging period
@@ -37,7 +37,7 @@ input bool                 InpRSIActive   = false;           // RSI active
 
 input int                  InpCCIMAPeriod = 14;             // CCI averaging period
 input ENUM_APPLIED_PRICE   InpCCIAppPrice = PRICE_TYPICAL;  // CCI type of price or handle
-input double               InpCCILevel    = 100;            // CCI level (upper = level , lower = -level)
+input double               InpCCILevel    = 150;            // CCI level (upper = level , lower = -level)
 input bool                 InpCCIActive   = true;           // CCI active
 
 
@@ -55,7 +55,7 @@ input int            InpHardStoDPeriod  = 3;             // D1 Sto D-period (per
 input int            InpHardStoSlowing  = 3;             // D1 Sto final smoothing
 input ENUM_MA_METHOD InpHardStoMAMethod = MODE_SMA;      // D1 Sto type of smoothing (0 SMA,1 EMA,2 SMMA,3 LWMA )
 input ENUM_STO_PRICE InpHardStoPrice    = STO_LOWHIGH;   // D1 Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
-input double         InpHardStoLevel    = 30;            // D1 Sto level (lower = 50-level , upper = 50 + level)
+input double         InpHardStoLevel    = 45;            // D1 Sto level (lower = 50-level , upper = 50 + level)
 input bool           InpHardStoActive   = true;          // D1 Sto active
 
 CTrade trade;
