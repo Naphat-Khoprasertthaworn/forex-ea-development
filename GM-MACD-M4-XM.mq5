@@ -13,7 +13,7 @@ static input long    InpMagicnumber = 234234;   // magic number (Integer+)
 
 input double         InpLotSize     = 0.01;     // lot size
 input int            InpPeriod      = 3600;     // period (sec)
-input int            InpTakeProfit  = 1030;      // take profit in points (point) (0=off)
+input int            InpTakeProfit  = 700;      // take profit in points (point) (0=off)
 input int            InpGridStep    = 150;      // step in grid system (point)
 input double         InpMaxLotSize  = 0.15;     // max lot size
 input double         InpLotMultiply = 1.5;      // multiply lot size
@@ -322,7 +322,7 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
    
    if(type==POSITION_TYPE_BUY){
       netProfit = (currentTick.bid - dynamicBuyPrice);
-      
+      double tempAccBuyLot = accBuyLot;
       if( InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accBuyLot ){
          Print("Buy - Stop Loss active");
       }
@@ -347,7 +347,7 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
             }
          }
          if(tempF){
-            Print( "MA BUY : netProfit : ",netProfit );
+            Print( "MA BUY : netProfit : ",netProfit*(1/_Point)*tempAccBuyLot );
             accBuyLot = 0;
             dynamicBuyPrice = 0;
             lastestBuyLotSize = InpLotSize;
@@ -367,6 +367,7 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
       
       if(netProfit>=(InpTakeProfit*_Point)*InpLotSize/accSellLot || (InpStopLoss > 0 && -netProfit >= (InpStopLoss*_Point)*InpLotSize/accSellLot )){
          bool tempF = true;
+         double tempAccSellLot = accSellLot;
          for(int i = totalTicket-1;i>=0;i--){
             PositionSelectByTicket( ticketArr[i] );
             double tempO,tempL;
@@ -386,7 +387,7 @@ bool CloseOrderMAOpen(ulong& ticketArr[]){
             }
          }
          if(tempF){
-            Print( "MA SELL : netProfit : ",netProfit );
+            Print( "MA SELL : netProfit : ",netProfit*(1/_Point)*tempAccSellLot );
             accSellLot = 0;
             dynamicSellPrice = 0;
             lastestSellLotSize = InpLotSize;
@@ -426,7 +427,11 @@ bool CloseOrderReduceDrawdown(ulong& ticketArr[]){
       }
       
       double profitDD = 0;
-      if(InpPercentTP > 0){profitDD = InpTakeProfit*_Point*(firstLotSize + lastLotSize)*(InpPercentTP/100);}
+//      if(InpPercentTP > 0){profitDD = InpTakeProfit*_Point*((firstLotSize + lastLotSize)/accLot)*(InpPercentTP/100);}
+//      if(InpPercentTP > 0){profitDD = InpTakeProfit*_Point*(InpPercentTP/100);}
+//      if(InpPercentTP > 0){profitDD = InpTakeProfit*_Point*((firstLotSize + lastLotSize)/accLot);}
+      if(InpPercentTP > 0){profitDD = InpTakeProfit*_Point*((firstLotSize + lastLotSize)*(InpPercentTP/100));}
+
       else{profitDD = InpTakeProfit*_Point*InpLotSize;}
       
       if(profit >= profitDD ){
@@ -447,11 +452,11 @@ bool CloseOrderReduceDrawdown(ulong& ticketArr[]){
          }
          
          if(type==POSITION_TYPE_BUY){
-            Print("ReduceDD : Buy : profit : ",profit," profitDD : ",profitDD," ",tempFlagLast," ",tempFlagFirst);
+            Print("ReduceDD : Buy : profit : ",profit*(1/_Point)," profitDD : ",profitDD*(1/_Point)," ",tempFlagLast," ",tempFlagFirst);
             dynamicBuyPrice = (dynamicBuyPrice*accBuyLot - tempFlagLast*lastOpenPrice*lastLotSize - tempFlagFirst*firstOpenPrice*firstLotSize) / (accBuyLot - tempFlagLast*lastLotSize - tempFlagFirst*firstLotSize);
             accBuyLot = accBuyLot - tempFlagFirst*firstLotSize - tempFlagLast*lastLotSize;
          }else{
-            Print("ReduceDD : Sell : profit : ",profit," profitDD : ",profitDD," ",tempFlagLast," ",tempFlagFirst);
+            Print("ReduceDD : Sell : profit : ",profit*(1/_Point)," profitDD : ",profitDD*(1/_Point)," ",tempFlagLast," ",tempFlagFirst);
             dynamicSellPrice = (dynamicSellPrice*accSellLot - tempFlagLast*lastOpenPrice*lastLotSize - tempFlagFirst*firstOpenPrice*firstLotSize) / (accSellLot - tempFlagLast*lastLotSize - tempFlagFirst*firstLotSize);
             accSellLot = accSellLot - tempFlagFirst*firstLotSize - tempFlagLast*lastLotSize;
          }
