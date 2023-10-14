@@ -16,7 +16,7 @@ input int            InpTakeProfit  = 700;      // take profit in points (point)
 input int            InpGridStep    = 150;      // step in grid system (point)
 input double         InpMaxLotSize  = 0.15;     // max lot size
 input double         InpLotMultiply = 1.5;      // multiply lot size
-input double         InpPercentTP   = 30;       // percent for greedy! [0-100]
+input double         InpPercentTP   = 0;        // percent for greedy! [0-100]
 input int            InpMATicket    = 4;        // InpMATicket (Integer+)
 input int            InpStopLoss    = 0;        // stop loss in points (pls dont use it!) (point) (0=off)
 input double         InpMaxAccLot   = 1;        // ex. InpMaxAccLot = 1 is max of accBuyLot and accSellLot = 0.5
@@ -26,25 +26,25 @@ input int            InpStoDPeriod  = 3;              // Sto D-period (period of
 input int            InpStoSlowing  = 3;              // Sto final smoothing
 input ENUM_MA_METHOD InpStoMAMethod = MODE_SMA;       // Sto type of smoothing (0 SMA,1 EMA,2 SMMA,3 LWMA )
 input ENUM_STO_PRICE InpStoPrice    = STO_LOWHIGH;    // Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
-input double         InpStoLevel    = 20;             // Sto Level (lower = 50 - level,upper = 50 + level)
-input bool           InpStoActive   = false;           // Sto active
+input double         InpStoLevel    = 45;             // Sto Level (lower = 50 - level,upper = 50 + level)
+input bool           InpStoActive   = true;           // Sto active
 
 input int                  InpRSIMAPeriod = 14;             // RSI averaging period
 input ENUM_APPLIED_PRICE   InpRSIAppPrice = PRICE_CLOSE;    // RSI type of price or handle
-input double               InpRSILevel    = 20;             // RSI level (lower = 50 - level , upper = 50 + level)
-input bool                 InpRSIActive   = false;           // RSI active
+input double               InpRSILevel    = 25;             // RSI level (lower = 50 - level , upper = 50 + level)
+input bool                 InpRSIActive   = false;          // RSI active
 
 input int                  InpCCIMAPeriod = 14;             // CCI averaging period
 input ENUM_APPLIED_PRICE   InpCCIAppPrice = PRICE_TYPICAL;  // CCI type of price or handle
-input double               InpCCILevel    = 150;            // CCI level (upper = level , lower = -level)
-input bool                 InpCCIActive   = true;           // CCI active
+input double               InpCCILevel    = 180;            // CCI level (upper = level , lower = -level)
+input bool                 InpCCIActive   = false;          // CCI active
 
 
 input int                  InpMACDFastPeriod    = 12;             // MACD period for Fast average calculation
 input int                  InpMACDSlowPeriod    = 26;             // MACD period for Slow average calculation
 input int                  InpMACDSignalPeriod  = 9;              // MACD period for their difference averaging
 input ENUM_APPLIED_PRICE   InpMACDAppPrice      = PRICE_CLOSE;    // MACD type of price or handle
-input double               InpMACDLevel         = 0.004;          // MACD level (lower = 0-level , upper = 0+level)
+input double               InpMACDLevel         = 0.0007;         // MACD level (lower = 0-level , upper = 0+level)
 input ENUM_TIMEFRAMES      InpMACDTimeFrame     = PERIOD_H1;      // MACD timeframe
 input bool                 InpMACDActive        = true;           // MACD active
 
@@ -56,6 +56,8 @@ input ENUM_MA_METHOD InpHardStoMAMethod = MODE_SMA;      // D1 Sto type of smoot
 input ENUM_STO_PRICE InpHardStoPrice    = STO_LOWHIGH;   // D1 Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
 input double         InpHardStoLevel    = 45;            // D1 Sto level (lower = 50-level , upper = 50 + level)
 input bool           InpHardStoActive   = true;          // D1 Sto active
+
+input bool           InpOptimizeMode    = false;         // Optimize mode is on = unable Print function
 
 class BorS:public CObject{
 private:
@@ -241,7 +243,7 @@ int OnInit(){
    handleHardSto = iStochastic(NULL,PERIOD_D1,InpHardStoKPeriod,InpHardStoDPeriod,InpHardStoSlowing,InpHardStoMAMethod,InpHardStoPrice);
    ArrayResize(hardStoMainBuffer,1);
    ArrayResize(hardStoSignalBuffer,1);
-
+   //Print(Point());
    return(INIT_SUCCEEDED);
 }
 
@@ -267,9 +269,9 @@ void OnTick(){
       trade.Sell(nextOpenLot(sellObj),NULL,currentTick.bid,0,0,NULL);
    }
 
-   Comment("Ask: ",currentTick.ask," nextBuyPrice: ", nextOpenPrice(buyObj),  " BuyProfit: ",   buyObj.getProfit(),  " accBuyLot: ",   buyObj.getAccLots(),
-         "\nBid: ",currentTick.bid," nextSellPrice: ",nextOpenPrice(sellObj), " SellProfit: ",  sellObj.getProfit(), " accSellLot: ",  sellObj.getAccLots(),
-         "\nSpread: ",currentTick.ask - currentTick.bid,
+   Comment("Ask: ",NormalizeDouble(currentTick.ask,5)," nextBuyPrice: ",NormalizeDouble(nextOpenPrice(buyObj),2),  " BuyProfit: ",NormalizeDouble(buyObj.getProfit(),2),  " accBuyLot: ",buyObj.getAccLots(),
+         "\nBid: ",NormalizeDouble(currentTick.bid,5)," nextSellPrice: ",NormalizeDouble(nextOpenPrice(sellObj),2), " SellProfit: ",NormalizeDouble(sellObj.getProfit(),2), " accSellLot: ",sellObj.getAccLots(),
+         "\nSpread: ",NormalizeDouble(currentTick.ask - currentTick.bid,6),
          "\nlastestBuyLotSize: ",   buyObj.getLastLot(), " lastestBuyTime: ", buyObj.getLastOpenTime(),  " buyStatus: ",buyObj.getStatus(),  " buySignal: ",   buySignal,
          "\nlastestSellLotSize: ",  sellObj.getLastLot()," lastestSellTime: ",sellObj.getLastOpenTime(), " sellStatus", sellObj.getStatus(), " sellSignal: ",  sellSignal
          );
@@ -284,7 +286,7 @@ double nextOpenPrice(BorS& bs){
    double lastOpenPrice = bs.getLastPrice();
    long type = bs.getType();
    if(lastOpenPrice==0){return (type==POSITION_TYPE_BUY) ? currentTick.ask : currentTick.bid;}
-   return (type==POSITION_TYPE_BUY) ? lastOpenPrice + InpGridStep*Point() : lastOpenPrice - InpGridStep*Point();
+   return (type==POSITION_TYPE_BUY) ? lastOpenPrice - InpGridStep*Point() : lastOpenPrice + InpGridStep*Point();
 }
 
 datetime nextOpenTime(BorS& bs){
@@ -311,7 +313,7 @@ bool CloseOrderMAOpen(BorS& bs){
    double profit = bs.getProfit();
    if(profit >= InpTakeProfit*InpLotSize){
       if(bs.closeAllOrders()){
-         Print( "MA type : ",bs.getType()," profit : ",profit );
+         if(!InpOptimizeMode){Print( "MA type : ",bs.getType()," profit : ",profit );}
          return true;
       }else{
          Print("MA Close -> some bug");
@@ -336,7 +338,7 @@ bool CloseOrderReduceDrawdown(BorS& bs){
       int profit = bs.getProfitByIndex(i) + bs.getProfitByIndex(staticSize-1-i);
       if(profit >= InpTakeProfit*InpLotSize*((100+InpPercentTP)/100)){
          realSize -= bs.closeOrderByIndex(i)+bs.closeOrderByIndex(staticSize-1-i);
-         Print("ReduceDD : ",bs.getType()," | profit : ",profit," | profitDD : ",InpTakeProfit*InpLotSize*((100+InpPercentTP)/100));
+         if(!InpOptimizeMode){Print("ReduceDD : ",bs.getType()," | profit : ",profit," | profitDD : ",InpTakeProfit*InpLotSize*((100+InpPercentTP)/100));}
       }else{
          break;
       }
