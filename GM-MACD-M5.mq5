@@ -18,7 +18,6 @@ input double         InpMaxLotSize  = 0.15;     // max lot size
 input double         InpLotMultiply = 1.5;      // multiply lot size
 input double         InpPercentTP   = 0;        // percent for greedy! [0-100]
 input int            InpMATicket    = 4;        // InpMATicket (Integer+)
-input int            InpStopLoss    = 0;        // stop loss in points (pls dont use it!) (point) (0=off)
 input double         InpMaxAccLot   = 1;        // ex. InpMaxAccLot = 1 is max of accBuyLot and accSellLot = 0.5
 
 input int            InpStoKPeriod  = 5;              // Sto K-period (number of bars for calculations)
