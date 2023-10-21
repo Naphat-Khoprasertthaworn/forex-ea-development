@@ -254,11 +254,14 @@ void OnTick(){
    
    if(IsNewBar()){UpdateIndicatorBuffer();SignalByIndicator();}
    
-   if(!buyObj.loadTickets()){Print("Failed to load buyObj tickets");}
+   if(!buyObj.loadTickets()){Print("Failed to load buyObj tickets for checking close order");}
    else{CloseOrder(buyObj);}
    
-   if(!sellObj.loadTickets()){Print("Failed to load sellObj tickets");}
+   if(!sellObj.loadTickets()){Print("Failed to load sellObj tickets for checking close order");}
    else{CloseOrder(sellObj);}
+   
+   if(!buyObj.loadTickets()){Print("Failed to load buyObj tickets");}
+   if(!sellObj.loadTickets()){Print("Failed to load sellObj tickets");}
    
    if(currentTick.ask<=nextOpenPrice(buyObj) && nextOpenTime(buyObj) <= currentTick.time && buySignal && buyObj.getAccLots() + nextOpenLot(buyObj) < InpMaxAccLot/2 ){
       trade.Buy(nextOpenLot(buyObj),NULL,currentTick.ask,0,0,NULL);
