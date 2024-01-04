@@ -8,55 +8,59 @@
 #include <Arrays/ArrayDouble.mqh>
 #include <Math/Stat/Math.mqh>
 
-static input long    InpMagicnumber = 234234;   // magic number (Integer+)
+static input long       InpMagicnumber    = 234234;   // magic number (Integer+) THIS IS MT4 VERSION
 
-input double         InpLotSize     = 0.01;     // lot size
-input int            InpPeriod      = 3600;     // period (sec)
-input int            InpTakeProfit  = 700;      // take profit in points (point) (0=off)
-input int            InpGridStep    = 150;      // step in grid system (point)
-input double         InpMaxLotSize  = 0.15;     // max lot size
-input double         InpLotMultiply = 1.5;      // multiply lot size
-input double         InpPercentTP   = 0;        // percent for greedy! [0-100]
-input int            InpMATicket    = 4;        // InpMATicket (Integer+)
-input double         InpMaxAccLot   = 1;        // ex. InpMaxAccLot = 1 is max of accBuyLot and accSellLot = 0.5
+input double            InpLotSize        = 0.01;        // lot size
+input int               InpPeriod         = 3600;        // period (sec)
+input int               InpTakeProfit     = 700;         // take profit in points (point) (0=off)
+input int               InpGridStep       = 150;         // step in grid system (point)
+input double            InpMaxLotSize     = 0.15;        // max lot size
+input double            InpLotMultiply    = 1.5;         // multiply lot size
+input double            InpPercentTP      = 30;          // percent for greedy! [0-100]
+input int               InpMATicket       = 4;           // InpMATicket (Integer+)
+input int               InpStopLoss       = 0;           // stop loss in points (pls dont use it!) (point) (0=off)
+input double            InpMaxAccLot      = 1;           // ex. InpMaxAccLot = 1 is max of accBuyLot and accSellLot = 0.5
+input bool              InpOptimizeMode   = false;       // Optimize mode is on = unable Print function
+input ENUM_TIMEFRAMES   InpTimeFrame      = PERIOD_H1;   // timeframe for check new bar
 
-input int            InpStoKPeriod  = 5;              // Sto K-period (number of bars for calculations)
-input int            InpStoDPeriod  = 3;              // Sto D-period (period of first smoothing)
-input int            InpStoSlowing  = 3;              // Sto final smoothing
-input ENUM_MA_METHOD InpStoMAMethod = MODE_SMA;       // Sto type of smoothing (0 SMA,1 EMA,2 SMMA,3 LWMA )
-input ENUM_STO_PRICE InpStoPrice    = STO_LOWHIGH;    // Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
-input double         InpStoLevel    = 45;             // Sto Level (lower = 50 - level,upper = 50 + level)
-input bool           InpStoActive   = true;           // Sto active
+
+input int               InpStoKPeriod     = 5;              // Sto K-period (number of bars for calculations)
+input int               InpStoDPeriod     = 3;              // Sto D-period (period of first smoothing)
+input int               InpStoSlowing     = 3;              // Sto final smoothing
+input ENUM_MA_METHOD    InpStoMAMethod    = MODE_SMA;       // Sto type of smoothing (0 SMA,1 EMA,2 SMMA,3 LWMA )
+input ENUM_STO_PRICE    InpStoPrice       = STO_LOWHIGH;    // Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
+input double            InpStoLevel       = 20;             // Sto Level (lower = 50 - level,upper = 50 + level)
+input bool              InpStoActive      = false;          // Sto active
+input ENUM_TIMEFRAMES   InpStoTimeFrame   = PERIOD_H1;      // Sto timeframe
 
 input int                  InpRSIMAPeriod = 14;             // RSI averaging period
 input ENUM_APPLIED_PRICE   InpRSIAppPrice = PRICE_CLOSE;    // RSI type of price or handle
-input double               InpRSILevel    = 25;             // RSI level (lower = 50 - level , upper = 50 + level)
+input double               InpRSILevel    = 20;             // RSI level (lower = 50 - level , upper = 50 + level)
 input bool                 InpRSIActive   = false;          // RSI active
+input ENUM_TIMEFRAMES      InpRSITimeFrame= PERIOD_H1;      // RSI timeframe
 
 input int                  InpCCIMAPeriod = 14;             // CCI averaging period
 input ENUM_APPLIED_PRICE   InpCCIAppPrice = PRICE_TYPICAL;  // CCI type of price or handle
-input double               InpCCILevel    = 180;            // CCI level (upper = level , lower = -level)
-input bool                 InpCCIActive   = false;          // CCI active
-
+input double               InpCCILevel    = 150;            // CCI level (upper = level , lower = -level)
+input bool                 InpCCIActive   = true;           // CCI active
+input ENUM_TIMEFRAMES      InpCCITimeFrame= PERIOD_H1;      // CCI timeframe
 
 input int                  InpMACDFastPeriod    = 12;             // MACD period for Fast average calculation
 input int                  InpMACDSlowPeriod    = 26;             // MACD period for Slow average calculation
 input int                  InpMACDSignalPeriod  = 9;              // MACD period for their difference averaging
 input ENUM_APPLIED_PRICE   InpMACDAppPrice      = PRICE_CLOSE;    // MACD type of price or handle
-input double               InpMACDLevel         = 0.0007;         // MACD level (lower = 0-level , upper = 0+level)
-input ENUM_TIMEFRAMES      InpMACDTimeFrame     = PERIOD_H1;      // MACD timeframe
+input double               InpMACDLevel         = 0.004;          // MACD level (lower = 0-level , upper = 0+level)
 input bool                 InpMACDActive        = true;           // MACD active
+input ENUM_TIMEFRAMES      InpMACDTimeFrame     = PERIOD_H1;      // MACD timeframe
 
-
-input int            InpHardStoKPeriod  = 5;             // D1 Sto K-period (number of bars for calculations)
-input int            InpHardStoDPeriod  = 3;             // D1 Sto D-period (period of first smoothing)
-input int            InpHardStoSlowing  = 3;             // D1 Sto final smoothing
-input ENUM_MA_METHOD InpHardStoMAMethod = MODE_SMA;      // D1 Sto type of smoothing (0 SMA,1 EMA,2 SMMA,3 LWMA )
-input ENUM_STO_PRICE InpHardStoPrice    = STO_LOWHIGH;   // D1 Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
-input double         InpHardStoLevel    = 45;            // D1 Sto level (lower = 50-level , upper = 50 + level)
-input bool           InpHardStoActive   = true;          // D1 Sto active
-
-input bool           InpOptimizeMode    = false;         // Optimize mode is on = unable Print function
+input int               InpHardStoKPeriod    = 5;             // D1 Sto K-period (number of bars for calculations)
+input int               InpHardStoDPeriod    = 3;             // D1 Sto D-period (period of first smoothing)
+input int               InpHardStoSlowing    = 3;             // D1 Sto final smoothing
+input ENUM_MA_METHOD    InpHardStoMAMethod   = MODE_SMA;      // D1 Sto type of smoothing (0 SMA,1 EMA,2 SMMA,3 LWMA )
+input ENUM_STO_PRICE    InpHardStoPrice      = STO_LOWHIGH;   // D1 Sto stochastic calculation method (0 LOWHIGH,1 CLOSECLOSE)
+input double            InpHardStoLevel      = 45;            // D1 Sto level (lower = 50-level , upper = 50 + level)
+input bool              InpHardStoActive     = true;          // D1 Sto active
+input ENUM_TIMEFRAMES   InpHardStoTimeFrame  = PERIOD_D1;     // D1 Sto timeframe
 
 class BorS:public CObject{
 private:
@@ -223,14 +227,14 @@ int OnInit(){
    buySignal = false;
    sellSignal = false;
 
-   handleSto = iStochastic( NULL,PERIOD_H1,InpStoKPeriod,InpStoDPeriod,InpStoSlowing,InpStoMAMethod,InpStoPrice ); 
+   handleSto = iStochastic( NULL,InpStoTimeFrame,InpStoKPeriod,InpStoDPeriod,InpStoSlowing,InpStoMAMethod,InpStoPrice ); 
    ArrayResize(stoMainBuffer,1);
    ArrayResize(stoSignalBuffer,1);
    
-   handleRSI = iRSI(NULL,PERIOD_H1,InpRSIMAPeriod,InpRSIAppPrice);
+   handleRSI = iRSI(NULL,InpRSITimeFrame,InpRSIMAPeriod,InpRSIAppPrice);
    ArrayResize(rsiBuffer,1);
    
-   handleCCI = iCCI(NULL,PERIOD_H1,InpCCIMAPeriod,InpCCIAppPrice);
+   handleCCI = iCCI(NULL,InpCCITimeFrame,InpCCIMAPeriod,InpCCIAppPrice);
    ArrayResize(cciBuffer,1);
    
    handleMACD = iMACD(NULL,InpMACDTimeFrame,InpMACDFastPeriod,InpMACDSlowPeriod,InpMACDSignalPeriod,InpMACDAppPrice);
@@ -239,7 +243,7 @@ int OnInit(){
    ArrayResize(macdSignalBuffer,1);
    ArrayResize(macdSignalTempBuffer,1);
    
-   handleHardSto = iStochastic(NULL,PERIOD_D1,InpHardStoKPeriod,InpHardStoDPeriod,InpHardStoSlowing,InpHardStoMAMethod,InpHardStoPrice);
+   handleHardSto = iStochastic(NULL,InpHardStoTimeFrame,InpHardStoKPeriod,InpHardStoDPeriod,InpHardStoSlowing,InpHardStoMAMethod,InpHardStoPrice);
    ArrayResize(hardStoMainBuffer,1);
    ArrayResize(hardStoSignalBuffer,1);
    //Print(Point());
@@ -337,7 +341,7 @@ bool CloseOrderReduceDrawdown(BorS& bs){
       if(realSize<=InpMATicket){
          return true;
       }
-      int profit = bs.getProfitByIndex(i) + bs.getProfitByIndex(staticSize-1-i);
+      double profit = bs.getProfitByIndex(i) + bs.getProfitByIndex(staticSize-1-i);
       if(profit >= InpTakeProfit*InpLotSize*((100+InpPercentTP)/100)){
          realSize -= bs.closeOrderByIndex(i)+bs.closeOrderByIndex(staticSize-1-i);
          if(!InpOptimizeMode){Print("ReduceDD : ",bs.getType()," | profit : ",profit," | profitDD : ",InpTakeProfit*InpLotSize*((100+InpPercentTP)/100));}
@@ -437,7 +441,7 @@ void CCISignal(){
 
 bool IsNewBar(){
    static datetime previousTime = 0;
-   datetime currentTime = iTime(_Symbol,PERIOD_H1,0);
+   datetime currentTime = iTime(Symbol(),InpTimeFrame,0);
    if(previousTime!=currentTime){
       previousTime = currentTime;
       return true;
