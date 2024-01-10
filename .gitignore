@@ -33,3 +33,5 @@
 
 *.ex5
 *.lnk
+
+.vscode
