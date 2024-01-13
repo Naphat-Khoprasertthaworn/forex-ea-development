@@ -15,35 +15,42 @@
 #include "ExpertAdvisor.mqh"
 
 #include <Generic\HashMap.mqh>
-#include <Generic\RedBlackTree.mqh>
+#include <Generic\SortedMap.mqh>
 
 static input long    InpMagicnumber = 234234;   // magic number (Integer+)
 
 class GMExpert: public ExpertAdvisor{
 public:
-    CRedBlackTree<CKeyValuePair<double,ulong>> tree;
+    CSortedMap<double,ulong> sortedMap;
 
     GMExpert(long inpType,long inpMagicNumber):ExpertAdvisor(inpType,inpMagicNumber){};
 
 };
+ulong ticketArr[] = {1,2,3,4,5,6,7};
+double lotArr[] = {0.01,0.02,0.03,0.05,0.08,0.08,0.08};
+double gridArr[]  = {100,150,225,338,507,761,1142};
 
-ulong ticketArr[10] = {1,2,3,4,5,6,7,8,9,10};
-double gridArr[10]  = {0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};
+ulong newTicketArr[] = {2,3,4,5,6};
 
 GMExpert buyObj(POSITION_TYPE_BUY,InpMagicnumber);
 
 int OnInit(){
-
-    for(int i=0;i<10;i++){
-        CKeyValuePair<double,ulong> data;
-        //data.Add(gridArr[i],ticketArr[i]);
-        data.Key(gridArr[i]);
-        data.Value(ticketArr[i])
-        buyObj.tree.Add(&data);
-
-        Print(buyObj.tree.Count());
-
+   //buyObj.sortedMap.Remove(0);
+    for(int i=0;i<ArraySize(ticketArr);i++){   
+        buyObj.sortedMap.Add(gridArr[i],ticketArr[i]);
+        Print(buyObj.sortedMap.Count());
     }
+
+    double key[];
+    ulong value[];
+    
+    buyObj.sortedMap.CopyTo(key,value);
+
+    ArrayPrint(key);
+    ArrayPrint(value);
+
+
+
     return(INIT_SUCCEEDED);
 }
 //+------------------------------------------------------------------+

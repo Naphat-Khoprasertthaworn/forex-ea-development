@@ -6,13 +6,11 @@
 #include <Trade/AccountInfo.mqh>
 #include <Arrays/ArrayDouble.mqh>
 #include <Math/Stat/Math.mqh>
-#include <Generic\HashMap.mqh>
-
-#include <Arrays\Tree.mqh>
 
 #include "ExpertAdvisor.mqh"
 
-#include 
+#include <Generic\HashMap.mqh>
+#include <Generic\SortedMap.mqh>
 
 static input long    InpMagicnumber = 234234;   // magic number (Integer+)
 
@@ -66,43 +64,181 @@ input bool           InpHardStoActive   = true;          // D1 Sto active
 
 input bool           InpOptimizeMode    = false;         // Optimize mode is on = unable Print function
 
-class TreeOrder: public CTree{
-public:
-    OrderNode* findByGrid(double gridStep){
-        OrderNode *res = NULL;
-        OrderNode *node;
-
-        node = new OrderNode(0,gridStep);
-        if(node==NULL) return NULL;
-
-        res = Find(node);
-        delete node;
-        return res;
-    }
-
-    OrderNode* CreateElement(){
-        OrderNode *node = new OrderNode(0,0);
-        return node;
-    }
-};
 
 class GMExpert: public ExpertAdvisor{
 public:
-    CTree tree;
+   CSortedMap<double,ulong> sortedGridMap;
+   CSortedMap<double,ulong> sortedLotMap;
 
-    GMExpert(long inpType):ExpertAdvisor(inpType){
-    };
+   GMExpert(long inpType,long inpMagicNumber):ExpertAdvisor(inpType,inpMagicNumber){};
+
+   void removeToUpdateSortedMap(){
+      removeGridMap();
+      removeLotMap();
+   }
+
+   // GRID MAP
+   void removeGridMap(){
+      this.loadTickets();
+      ulong ticketArr[];
+      int sizeArr = this.getTicketArr(ticketArr);
+
+      ulong oldTicketArr[];
+      double oldGridArr[];
+      sortedGridMap.CopyTo(oldGridArr,oldTicketArr);
+
+      for(int i=0;i<ArraySize(oldGridArr);i++){
+         int idx = ArrayBsearch(ticketArr,oldTicketArr[i]);
+         if( 0>idx || idx>=sizeArr || ticketArr[idx]!=oldTicketArr[i] ){
+            sortedGridMap.Remove(oldGridArr[i]);
+         }
+      }
+   }
+
+   bool addGridMap(double grid, ulong ticket){
+      if(sortedGridMap.ContainsKey(grid)){
+         return false;
+      }
+      sortedGridMap.Add(grid,ticket);
+      return true;
+   }
+
+   double findAvailableGrid(){
+      for(int i=0;i<ArraySize(gridTemplate);i++){
+         if(!sortedGridMap.ContainsKey(gridTemplate[i])){
+            return gridTemplate[i];
+         }
+      }
+      return InpGridStep;
+   }
+
+   // LOT MAP
+   void removeLotMap(){
+      this.loadTickets();
+      ulong ticketArr[];
+      int sizeArr = this.getTicketArr(ticketArr);
+
+      ulong oldTicketArr[];
+      double oldLotArr[];
+      sortedLotMap.CopyTo(oldLotArr,oldTicketArr);
+
+      for(int i=0;i<ArraySize(oldLotArr);i++){
+         int idx = ArrayBsearch(ticketArr,oldTicketArr[i]);
+         if( 0>idx || idx>=sizeArr || ticketArr[idx]!=oldTicketArr[i] ){
+            sortedLotMap.Remove(oldLotArr[i]);
+         }
+      }
+   }
+
+   bool addLotMap(double lot, ulong ticket){
+      if(sortedLotMap.ContainsKey(lot)){
+         return false;
+      }
+      sortedLotMap.Add(lot,ticket);
+      return true;
+   }
+
+   double findAvailableLot(){
+      for(int i=0;i<ArraySize(lotTemplate);i++){
+         if(!sortedLotMap.ContainsKey(lotTemplate[i])){
+            return NormalizeDouble(lotTemplate[i],2);
+         }
+      }
+      return InpLotSize;
+   }
+
+   // NEXT OPEN PRICE 
+   double nextOpenPrice(){
+      double lastOpenPrice = getLastPrice();
+      long type = getType();
+      if(lastOpenPrice==0){return (type==POSITION_TYPE_BUY) ? currentTick.ask : currentTick.bid;}
+      double gridStep = findAvailableGrid();
+      
+      return (type==POSITION_TYPE_BUY) ? lastOpenPrice - gridStep*Point() : lastOpenPrice + gridStep*Point();
+   }
+
+   // NEXT OPEN TIME
+   datetime nextOpenTime(){
+      return getLastOpenTime() + InpPeriod;
+   }
+
+   // CLOSE ORDER
+   bool closeOrder(){
+      if(getStatus()){
+         if(getTicketCount() > InpMATicket){
+            if(closeOrderReduceDrawdown()){
+               closeOrderMAOpen();
+               return true;
+            }else{
+               return false;
+            }
+         }else{
+            return closeOrderMAOpen();
+         }
+      }
+      return false;
+   }
+
+   bool closeOrderMAOpen(){
+      double profit = getProfit();
+      if(profit >= InpTakeProfit*InpLotSize){
+         if(closeAllOrders()){
+            if(!InpOptimizeMode){Print( "MA type : ",getType()," profit : ",profit );}
+            return true;
+         }else{
+            Print("MA Close -> some bug");
+         }
+      }
+      return false;
+   }
+
+   bool closeOrderReduceDrawdown(){
+      ulong ticketArr[];
+      // int staticSize = getTicketArr(ticketArr);
+      int realSize = getTicketArr(ticketArr);
+      if(realSize<=0){
+         Print("close RDD : fail to get tickets");
+         return false;
+      }
+      
+      /*for(int i=0;i<(int)(getTicketCount()/2);i++ ){
+         if(realSize<=InpMATicket){
+            return true;
+         }else if(staticSize-1-i <= i){
+            return false;
+         }
+         double profit = getProfitByIndex(i) + getProfitByIndex(staticSize-1-i);
+         if(profit >= InpTakeProfit*InpLotSize*((100+InpPercentTP)/100)){
+            realSize = realSize - closeOrderByIndex(i) - closeOrderByIndex(staticSize-1-i);
+            if(!InpOptimizeMode){Print("ReduceDD : ",getType()," | profit : ",profit," | profitDD : ",InpTakeProfit*InpLotSize*((100+InpPercentTP)/100));}
+         }
+         
+      }*/
+      
+      for(int i=0;i<getTicketCount()-1;i++){
+         for(int j=i+1;j<getTicketCount();j++){
+            if(realSize<=InpMATicket){
+               return true;
+            }
+            double profit = getProfitByIndex(i) + getProfitByIndex(j);
+            if(profit >= InpTakeProfit*InpLotSize*((100+InpPercentTP)/100)){
+               realSize = realSize - closeOrderByIndex(i) - closeOrderByIndex(j);
+               if(!InpOptimizeMode){Print("ReduceDD : ",getType()," | profit : ",profit," | profitDD : ",InpTakeProfit*InpLotSize*((100+InpPercentTP)/100));}
+            }
+         }
+      }
+      return false;
+   }
 
 };
 
-ExpertAdvisor buyObj(POSITION_TYPE_BUY);
-ExpertAdvisor sellObj(POSITION_TYPE_SELL);
+GMExpert buyObj(POSITION_TYPE_BUY, InpMagicnumber);
+GMExpert sellObj(POSITION_TYPE_SELL, InpMagicnumber);
 
-CTrade trade;
 MqlTick currentTick;
 
+// INDICATOR & SIGNAL
 bool buySignal;
-
 bool sellSignal;
 
 int handleSto;
@@ -135,16 +271,32 @@ double hardStoSignalBuffer[];
 bool hardStoSellSignal;
 bool hardStoBuySignal;
 
-ulong buyTicketArr[];
-ulong sellTicketArr[];
+//  GRID & LOT TEMPLATE
+double lotTemplate[];
+double gridTemplate[];
+double lastBuyGrid, lastSellGrid;
 
-double buyGridArr[];
-double sellGridArr[];
-double buyLotArr[];
-double sellLotArr[];
-double gridArrTemplate[];
-double lotArrTemplate[];
+// SETUP
+void setLotTemplate(){
+   double lot = InpLotSize;
+   double accLot = 0;
+   while(true){
+      if(accLot > InpMaxAccLot){break;}
+      ArrayResize(lotTemplate,ArraySize(lotTemplate)+1);
+      lotTemplate[ArraySize(lotTemplate)-1] = lot;
+      accLot = accLot + lot;
+      lot = (InpLotMultiply*lot > InpMaxLotSize) ? InpMaxLotSize : NormalizeDouble(InpLotMultiply*lot,2);
+   }
+}
 
+void setGridTemplate(){
+   ArrayResize(gridTemplate,ArraySize(lotTemplate));
+   double grid = InpGridStep;
+   for(int i=0;i<ArraySize(gridTemplate);i++){
+      gridTemplate[i] = grid;
+      grid = (InpGridMultiply*grid > InpMaxGrid) ? InpMaxGrid : InpGridMultiply*grid;
+   }
+}
 
 int OnInit(){
    trade.SetExpertMagicNumber(InpMagicnumber);
@@ -171,6 +323,11 @@ int OnInit(){
    handleHardSto = iStochastic(NULL,PERIOD_D1,InpHardStoKPeriod,InpHardStoDPeriod,InpHardStoSlowing,InpHardStoMAMethod,InpHardStoPrice);
    ArrayResize(hardStoMainBuffer,1);
    ArrayResize(hardStoSignalBuffer,1);
+
+   
+   setLotTemplate();
+   setGridTemplate(); // call setLotTemplate() is essential.
+
    return(INIT_SUCCEEDED);
 }
 
@@ -184,165 +341,55 @@ void OnTick(){
    
    if(!buyObj.loadTickets()){Print("Failed to load buyObj tickets for checking close order");}
    else{
-      if(CloseOrder(buyObj)){
-         buyObj.loadTickets();
-         updateGridMap(buyObj,buyTicketArr,buyGridArr);
+      if(buyObj.closeOrder()){
+         buyObj.removeToUpdateSortedMap();
       }
    }
       
    if(!sellObj.loadTickets()){Print("Failed to load sellObj tickets for checking close order");}
    else{
-      if(CloseOrder(sellObj)){
-         sellObj.loadTickets();
-         updateGridMap(sellObj,sellTicketArr,sellGridArr);
+      if(sellObj.closeOrder()){
+         sellObj.removeToUpdateSortedMap();
       }
    }
    
    if(!buyObj.loadTickets()){Print("Failed to load buyObj tickets");}
    if(!sellObj.loadTickets()){Print("Failed to load sellObj tickets");}
 
-   if(currentTick.ask<=nextOpenPrice(buyObj) && nextOpenTime(buyObj) <= currentTick.time && buySignal && buyObj.getAccLots() + nextOpenLot(buyObj) < InpMaxAccLot/2 ){
-      if(trade.Buy(nextOpenLot(buyObj),NULL,currentTick.ask,0,0,NULL)){
+   if(currentTick.ask<=buyObj.nextOpenPrice() && buyObj.nextOpenTime() <= currentTick.time && buySignal && buyObj.getAccLots() + buyObj.findAvailableLot() < InpMaxAccLot/2 ){
+      if(trade.Buy(buyObj.findAvailableLot(),NULL,currentTick.ask,0,0,NULL)){
          ulong lastOrder = trade.ResultDeal();
-         double nextGrid = nextGridStep(buyObj, buyGridArr);
-         ArrayResize(buyTicketArr,ArraySize(buyTicketArr)+1);
-         ArrayResize(buyGridArr,ArraySize(buyGridArr)+1);
-         buyTicketArr[ArraySize(buyTicketArr)-1] = lastOrder;
-         buyGridArr[ArraySize(buyGridArr)-1] = nextGrid;
+         double nextGrid = buyObj.findAvailableGrid();
+         double nextLot = buyObj.findAvailableLot();
+         buyObj.addGridMap(nextGrid,lastOrder);
+         buyObj.addLotMap(nextLot,lastOrder);
       }
    }
    
-   if(currentTick.bid>=nextOpenPrice(sellObj) && nextOpenTime(sellObj) <= currentTick.time && sellSignal && sellObj.getAccLots() + nextOpenLot(sellObj) < InpMaxAccLot/2 ){
-      if(trade.Sell(nextOpenLot(sellObj),NULL,currentTick.bid,0,0,NULL)){
+   if(currentTick.bid>=sellObj.nextOpenPrice() && sellObj.nextOpenTime() <= currentTick.time && sellSignal && sellObj.getAccLots() + sellObj.findAvailableLot() < InpMaxAccLot/2 ){
+      if(trade.Sell(sellObj.findAvailableLot(),NULL,currentTick.bid,0,0,NULL)){
          ulong lastOrder = trade.ResultDeal();
-         double nextGrid = nextGridStep(sellObj, sellGridArr);
-         ArrayResize(sellTicketArr,ArraySize(sellTicketArr)+1);
-         ArrayResize(sellGridArr,ArraySize(sellGridArr)+1);
-         sellTicketArr[ArraySize(sellTicketArr)-1] = lastOrder;
-         sellGridArr[ArraySize(sellGridArr)-1] = nextGrid;
+         double nextGrid = sellObj.findAvailableGrid();
+         double nextLot = sellObj.findAvailableLot();
+         sellObj.addGridMap(nextGrid,lastOrder);
+         sellObj.addLotMap(nextLot,lastOrder);
       }
    }
-
-   double lastBuyGrid, lastSellGrid;
    
-   lastBuyGrid = (ArraySize(buyGridArr)==0) ? 0 : buyGridArr[ArraySize(buyGridArr)-1];
-   lastSellGrid = (ArraySize(sellGridArr)==0) ? 0 : sellGridArr[ArraySize(sellGridArr)-1];
+   double buyAvailableGrid = buyObj.findAvailableGrid();
+   double sellAvailableGrid = sellObj.findAvailableGrid();
+   double buyAvailableLot = buyObj.findAvailableLot();
+   double sellAvailableLot = sellObj.findAvailableLot();
 
-   Comment("Ask: ",NormalizeDouble(currentTick.ask,5)," nextBuyPrice: ",NormalizeDouble(nextOpenPrice(buyObj),2),  " BuyProfit: ",NormalizeDouble(buyObj.getProfit(),2),  " accBuyLot: ",NormalizeDouble(buyObj.getAccLots(),2),
-         "\nBid: ",NormalizeDouble(currentTick.bid,5)," nextSellPrice: ",NormalizeDouble(nextOpenPrice(sellObj),2), " SellProfit: ",NormalizeDouble(sellObj.getProfit(),2), " accSellLot: ",NormalizeDouble(sellObj.getAccLots(),2),
-         "\nSpread: ",NormalizeDouble(currentTick.ask - currentTick.bid,6),
-         "\nlastestBuyLotSize: ",   buyObj.getLastLot(), " lastestBuyGrid: ",    lastBuyGrid,  " lastestBuyTime: ", buyObj.getLastOpenTime(),  " buyStatus: ",buyObj.getStatus(),  " buySignal: ",   buySignal,
-         "\nlastestSellLotSize: ",  sellObj.getLastLot()," lastestSellGrid: ",   lastSellGrid, " lastestSellTime: ",sellObj.getLastOpenTime(), " sellStatus", sellObj.getStatus(), " sellSignal: ",  sellSignal
+   Comment("Ask: ",NormalizeDouble(currentTick.ask,5)," nextBuyPrice: ",NormalizeDouble(buyObj.nextOpenPrice(),2),  " BuyProfit: ",NormalizeDouble(buyObj.getProfit(),2),  " accBuyLot: ",NormalizeDouble(buyObj.getAccLots(),2),
+         "\nBid: ",NormalizeDouble(currentTick.bid,5)," nextSellPrice: ",NormalizeDouble(sellObj.nextOpenPrice(),2), " SellProfit: ",NormalizeDouble(sellObj.getProfit(),2), " accSellLot: ",NormalizeDouble(sellObj.getAccLots(),2),
+         "\nSpread: ",NormalizeDouble(currentTick.ask - currentTick.bid,6),// " ",buyObj.sortedGridMap.Count()," ",buyObj.sortedLotMap.Count()," ",sellObj.sortedGridMap.Count()," ",sellObj.sortedLotMap.Count(),
+         "\nbuyAvailableLot: ",   buyAvailableLot, " buyAvailableGrid: ",    buyAvailableGrid ,  " lastestBuyTime: ", buyObj.getLastOpenTime(),  " buyStatus: ",buyObj.getStatus(),  " buySignal: ",   buySignal,
+         "\nsellAvailableLot: ",  sellAvailableLot," sellAvailableGrid: ",   sellAvailableGrid, " lastestSellTime: ",sellObj.getLastOpenTime(), " sellStatus", sellObj.getStatus(), " sellSignal: ",  sellSignal
          );
 }
 
-double nextOpenLot(ExpertAdvisor& bs){
-   double nextLot = (bs.getLastLot()==0) ? InpLotSize : bs.getLastLot()*InpLotMultiply;
-   return (nextLot > InpMaxLotSize) ? InpMaxLotSize : NormalizeDouble(nextLot,2);
-}
-
-double nextOpenPrice(ExpertAdvisor& bs){
-   double lastOpenPrice = bs.getLastPrice();
-   long type = bs.getType();
-   if(lastOpenPrice==0){return (type==POSITION_TYPE_BUY) ? currentTick.ask : currentTick.bid;}
-   
-   double gridStep;
-   
-   if(type==POSITION_TYPE_BUY){
-      gridStep = nextGridStep(bs, buyGridArr);
-   }else{
-      gridStep = nextGridStep(bs, sellGridArr);
-   }
-   return (type==POSITION_TYPE_BUY) ? lastOpenPrice - gridStep*Point() : lastOpenPrice + gridStep*Point();
-}
-
-void updateGridMap(ExpertAdvisor& bs, ulong& ticketGridArr[], double& gridArr[]){
-   ulong ticketArr[];
-   int sizeArr = bs.getTicketArr(ticketArr);
-   double newGrid[]; 
-   ArrayResize(newGrid,sizeArr);
-   for(int i=0;i<ArraySize(ticketGridArr);i++){
-      int idx = ArrayBsearch(ticketArr,ticketGridArr[i]);
-      if( 0 <= idx && idx < sizeArr && ticketArr[idx] == ticketGridArr[i] ){
-         newGrid[idx] = gridArr[i];
-      }
-   }
-   ArrayFree(ticketGridArr);
-   ArrayFree(gridArr);
-   ArrayCopy(ticketGridArr,ticketArr,0,0);
-   ArrayCopy(gridArr,newGrid,0,0);
-
-}
-
-double nextGridStep(ExpertAdvisor& bs, double& gridArr[]){
-   double lastGrid = (ArraySize(gridArr)==0) ? 0 : gridArr[ArraySize(gridArr)-1];
-   if(lastGrid==0){
-      lastGrid = InpGridStep;
-   }else if(lastGrid*InpGridMultiply > InpMaxGrid){
-      lastGrid = InpMaxGrid;
-   }else{
-      lastGrid = (int)(lastGrid*InpGridMultiply);
-   }
-   return lastGrid;
-}
-
-datetime nextOpenTime(ExpertAdvisor& bs){
-   return bs.getLastOpenTime() + InpPeriod;
-}
-
-bool CloseOrder(ExpertAdvisor& bs){
-   if(bs.getStatus()){
-      if(bs.getTicketCount() > InpMATicket){
-         if(CloseOrderReduceDrawdown(bs)){
-            CloseOrderMAOpen(bs);
-            return true;
-         }else{
-            return false;
-         }
-      }else{
-         return CloseOrderMAOpen(bs);
-      }
-   }
-   return false;
-}
-
-bool CloseOrderMAOpen(ExpertAdvisor& bs){
-   double profit = bs.getProfit();
-   if(profit >= InpTakeProfit*InpLotSize){
-      if(bs.closeAllOrders()){
-         if(!InpOptimizeMode){Print( "MA type : ",bs.getType()," profit : ",profit );}
-         return true;
-      }else{
-         Print("MA Close -> some bug");
-      }
-   }
-   return false;
-}
-
-bool CloseOrderReduceDrawdown(ExpertAdvisor& bs){
-   ulong ticketArr[];
-   int staticSize = bs.getTicketArr(ticketArr);
-   int realSize = bs.getTicketArr(ticketArr);
-   if(realSize<=0){
-      Print("close RDD : fail to get tickets");
-      return false;
-   }
-   
-   for(int i=0;i<(int)(bs.getTicketCount()/2);i++ ){
-      if(realSize<=InpMATicket){
-         return true;
-      }
-      double profit = bs.getProfitByIndex(i) + bs.getProfitByIndex(staticSize-1-i);
-      if(profit >= InpTakeProfit*InpLotSize*((100+InpPercentTP)/100)){
-         realSize -= bs.closeOrderByIndex(i)+bs.closeOrderByIndex(staticSize-1-i);
-         if(!InpOptimizeMode){Print("ReduceDD : ",bs.getType()," | profit : ",profit," | profitDD : ",InpTakeProfit*InpLotSize*((100+InpPercentTP)/100));}
-      }else{
-         break;
-      }
-   }
-   return false;
-}
-
+// INDICATOR
 void UpdateIndicatorBuffer(){
    CopyBuffer( handleSto,MAIN_LINE,0,1,stoMainBuffer );
    CopyBuffer( handleSto,SIGNAL_LINE,0,1,stoSignalBuffer );
@@ -430,6 +477,7 @@ void CCISignal(){
    }
 }
 
+// TIME DELAY
 bool IsNewBar(){
    static datetime previousTime = 0;
    datetime currentTime = iTime(_Symbol,PERIOD_H1,0);
