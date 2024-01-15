@@ -76,6 +76,24 @@ public:
       removeGridMap();
       removeLotMap();
    }
+   
+   void restoreGridMap(){
+      this.sortedGridMap.Clear();
+      this.sortedLotMap.Clear();
+   
+      for(int i = 0;i<ArraySize(ticketArr);i++){
+         double lot = getLotByIndex(i);
+         addLotMap(lot,ticketArr[i]);
+      }
+      
+      double lotArr[];
+      ulong ticketArrTemp[];
+      this.sortedLotMap.CopyTo(lotArr,ticketArrTemp);
+      
+      for(int i =0;i<ArraySize(ticketArrTemp);i++){
+         addGridMap(gridTemplate[i],ticketArrTemp[i]);
+      }
+   }
 
    // GRID MAP
    void removeGridMap(){
@@ -104,12 +122,23 @@ public:
    }
 
    double findAvailableGrid(){
+      if(ArraySize(ticketArr)==ArraySize(gridTemplate)){return -1;}
       for(int i=0;i<ArraySize(gridTemplate);i++){
          if(!sortedGridMap.ContainsKey(gridTemplate[i])){
             return gridTemplate[i];
+         }else if(gridTemplate[i] >= InpMaxGrid){
+            return InpMaxGrid;
          }
       }
       return InpGridStep;
+   }
+   
+   void printMapGrid(){
+      double key[];
+      ulong val[];
+      sortedGridMap.CopyTo(key,val);
+      ArrayPrint(key);
+      ArrayPrint(val);
    }
 
    // LOT MAP
@@ -139,12 +168,23 @@ public:
    }
 
    double findAvailableLot(){
+      if(ArraySize(ticketArr)==ArraySize(lotTemplate)){return -1;}
       for(int i=0;i<ArraySize(lotTemplate);i++){
          if(!sortedLotMap.ContainsKey(lotTemplate[i])){
             return NormalizeDouble(lotTemplate[i],2);
+         }else if(lotTemplate[i]>=InpMaxLotSize){
+            return InpMaxLotSize;
          }
       }
       return InpLotSize;
+   }
+   
+   void printMapLot(){
+      double key[];
+      ulong val[];
+      sortedLotMap.CopyTo(key,val);
+      ArrayPrint(key);
+      ArrayPrint(val);
    }
 
    // NEXT OPEN PRICE 
@@ -164,7 +204,7 @@ public:
 
    // CLOSE ORDER
    bool closeOrder(){
-      if(getStatus()){
+      if(ArraySize(ticketArr)>0){
          if(getTicketCount() > InpMATicket){
             if(closeOrderReduceDrawdown()){
                closeOrderMAOpen();
@@ -194,41 +234,59 @@ public:
 
    bool closeOrderReduceDrawdown(){
       ulong ticketArr[];
-      // int staticSize = getTicketArr(ticketArr);
+      int staticSize = getTicketArr(ticketArr);
       int realSize = getTicketArr(ticketArr);
       if(realSize<=0){
          Print("close RDD : fail to get tickets");
          return false;
       }
-      
-      /*for(int i=0;i<(int)(getTicketCount()/2);i++ ){
+      bool flag = false;
+      for(int i=0;i<(int)(getTicketCount()/2);i++ ){
          if(realSize<=InpMATicket){
-            return true;
+            flag = true;
+            break;
          }else if(staticSize-1-i <= i){
-            return false;
+            flag = false;
+            break;
          }
          double profit = getProfitByIndex(i) + getProfitByIndex(staticSize-1-i);
          if(profit >= InpTakeProfit*InpLotSize*((100+InpPercentTP)/100)){
+            flag = true;
             realSize = realSize - closeOrderByIndex(i) - closeOrderByIndex(staticSize-1-i);
             if(!InpOptimizeMode){Print("ReduceDD : ",getType()," | profit : ",profit," | profitDD : ",InpTakeProfit*InpLotSize*((100+InpPercentTP)/100));}
          }
          
+      }/*
+      if(flag){
+         removeToUpdateSortedMap();
       }*/
-      
+      return flag;
+      /*bool flag = false; // close order fast as possible, not consider with pair of oldest and newest order (not complete ticket j maybe conflict)
       for(int i=0;i<getTicketCount()-1;i++){
-         for(int j=i+1;j<getTicketCount();j++){
+         for(int j=getTicketCount()-1;j>=i+1;j--){
             if(realSize<=InpMATicket){
                return true;
             }
+            if(getLotByIndex(i) >= getLotByIndex(j)){
+               continue;
+            }
             double profit = getProfitByIndex(i) + getProfitByIndex(j);
             if(profit >= InpTakeProfit*InpLotSize*((100+InpPercentTP)/100)){
+               flag = true;
                realSize = realSize - closeOrderByIndex(i) - closeOrderByIndex(j);
+               removeToUpdateSortedMap();
                if(!InpOptimizeMode){Print("ReduceDD : ",getType()," | profit : ",profit," | profitDD : ",InpTakeProfit*InpLotSize*((100+InpPercentTP)/100));}
             }
          }
       }
-      return false;
+      return flag;*/
    }
+   
+   bool getStatus(){
+      return ArraySize(ticketArr) >= 0 && (ArraySize(ticketArr) < ArraySize(lotTemplate));
+   }
+   
+   
 
 };
 
@@ -327,7 +385,17 @@ int OnInit(){
    
    setLotTemplate();
    setGridTemplate(); // call setLotTemplate() is essential.
-
+   
+   buyObj.loadTickets();
+   sellObj.loadTickets();
+   
+   if(buyObj.getTicketCount()>0){
+      buyObj.restoreGridMap();
+   }
+   if(sellObj.getTicketCount()>0){
+      sellObj.restoreGridMap();
+   }
+   
    return(INIT_SUCCEEDED);
 }
 
@@ -356,7 +424,7 @@ void OnTick(){
    if(!buyObj.loadTickets()){Print("Failed to load buyObj tickets");}
    if(!sellObj.loadTickets()){Print("Failed to load sellObj tickets");}
 
-   if(currentTick.ask<=buyObj.nextOpenPrice() && buyObj.nextOpenTime() <= currentTick.time && buySignal && buyObj.getAccLots() + buyObj.findAvailableLot() < InpMaxAccLot/2 ){
+   if(buyObj.getStatus() && currentTick.ask<=buyObj.nextOpenPrice() && buyObj.nextOpenTime() <= currentTick.time && buySignal && buyObj.getAccLots() + buyObj.findAvailableLot() < InpMaxAccLot/2 ){
       if(trade.Buy(buyObj.findAvailableLot(),NULL,currentTick.ask,0,0,NULL)){
          ulong lastOrder = trade.ResultDeal();
          double nextGrid = buyObj.findAvailableGrid();
@@ -366,7 +434,7 @@ void OnTick(){
       }
    }
    
-   if(currentTick.bid>=sellObj.nextOpenPrice() && sellObj.nextOpenTime() <= currentTick.time && sellSignal && sellObj.getAccLots() + sellObj.findAvailableLot() < InpMaxAccLot/2 ){
+   if(sellObj.getStatus() && currentTick.bid>=sellObj.nextOpenPrice() && sellObj.nextOpenTime() <= currentTick.time && sellSignal && sellObj.getAccLots() + sellObj.findAvailableLot() < InpMaxAccLot/2 ){
       if(trade.Sell(sellObj.findAvailableLot(),NULL,currentTick.bid,0,0,NULL)){
          ulong lastOrder = trade.ResultDeal();
          double nextGrid = sellObj.findAvailableGrid();

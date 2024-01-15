@@ -13,7 +13,7 @@
 
 
 class ExpertAdvisor:public CObject{
-private:
+protected:
    long type;
    ulong ticketArr[];
    bool status;
@@ -90,10 +90,6 @@ public:
       ArrayFree(ticketArr);
    }
    
-   bool getStatus(){
-      return ArraySize(ticketArr)>=0;
-   }
-   
    bool isTicketsEmpty(){
       return ArraySize(ticketArr) == 0;
    }
@@ -106,6 +102,7 @@ public:
             flag = false;
          }
       }
+      //this.loadTickets();
       return flag;
    }
    
@@ -115,6 +112,7 @@ public:
       if(!trade.PositionClose(ticketArr[i])){
             return false;
       }
+      //this.loadTickets();
       return true;
    }
    
@@ -139,6 +137,12 @@ public:
    ulong getLastTicket(){
       if(ArraySize(ticketArr)<=0){return -1;}
       return ticketArr[ArraySize(ticketArr)-1];
+   }
+   
+   double getLotByIndex(int i){
+      if(i < 0 || i >= ArraySize(ticketArr)){return -1;}
+      PositionSelectByTicket(ticketArr[i]);
+      return PositionGetDouble(POSITION_VOLUME);
    }
 };
 
